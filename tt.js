@@ -1,4 +1,3 @@
-
 // ==UserScript==
 // @name         Thread Tracker
 // @namespace    http://tampermonkey.net/
@@ -774,11 +773,12 @@ requestAnimationFrame(() => {
         `;
         cogIcon.title = "Open Settings";
 
-        const titleContainer = document.createElement('div');
+const titleContainer = document.createElement('div');
         titleContainer.style.cssText = `
             display: flex;
             align-items: center;
-            justify-content: flex-start; /* Left-align title and cog */
+            justify-content: center; /* Center the title and cog */
+            width: 100%;             /* Make the container full-width */
             margin-bottom: 4px;
         `;
         titleContainer.appendChild(otkThreadTitleDisplay);
@@ -5842,6 +5842,10 @@ async function main() {
             /* The --otk-newdesign-msg-depthX... variables are removed as we will directly use the shared --otk-msg-depthX... vars */
         }
 
+        /* ADD THIS NEW RULE HERE */
+        #otk-stats-wrapper {
+            align-items: center !important; /* Center align the title and the stats block */
+        }
         /* --- New Design Specific Styles --- */
         #otk-viewer.otk-message-layout-newdesign { /* Target otkViewer when new design is active */
             background-color: var(--otk-newdesign-viewer-bg-color);
