@@ -704,6 +704,8 @@ requestAnimationFrame(() => {
             display: flex;
             align-items: stretch;
             user-select: none;
+            position: relative;
+            justify-content: space-between;
         `;
         otkGuiWrapper.appendChild(otkGui);
         document.body.style.paddingTop = '86px';
@@ -729,15 +731,17 @@ requestAnimationFrame(() => {
         const centerInfoContainer = document.createElement('div');
         centerInfoContainer.id = 'otk-center-info-container';
         centerInfoContainer.style.cssText = `
-            flex-grow: 1; /* Ensures it takes available space */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             display: flex;
             flex-direction: column;
-            align-items: center; /* Center the statsWrapper block */
-            justify-content: space-between;
+            align-items: center;
+            justify-content: center;
             padding: 0 10px;
+            pointer-events: none;
         `;
-        centerInfoContainer.style.flexGrow = '1';
-        consoleLog('[GUI Setup - Initial] centerInfoContainer.style.flexGrow explicitly set to 1.');
 
         // Wrapper for title and stats to keep them left-aligned but centered as a block
         const statsWrapper = document.createElement('div');
@@ -748,6 +752,7 @@ requestAnimationFrame(() => {
             align-items: flex-start; /* Left-align title and stats */
             width: fit-content; /* Only as wide as needed */
             max-width: 250px; /* Prevent excessive width */
+            pointer-events: auto;
         `;
 
         const otkThreadTitleDisplay = document.createElement('div');
@@ -773,12 +778,11 @@ requestAnimationFrame(() => {
         `;
         cogIcon.title = "Open Settings";
 
-const titleContainer = document.createElement('div');
+        const titleContainer = document.createElement('div');
         titleContainer.style.cssText = `
             display: flex;
             align-items: center;
-            justify-content: center; /* Center the title and cog */
-            width: 100%;             /* Make the container full-width */
+            justify-content: flex-start; /* Left-align title and cog */
             margin-bottom: 4px;
         `;
         titleContainer.appendChild(otkThreadTitleDisplay);
@@ -2878,90 +2882,70 @@ function _populateAttachmentDivWithMedia(
         } // End of else (default layout)
     }
 
-    // Signature simplified: scroll-related parameters removed
     async function appendNewMessagesToViewer(newMessages) {
         consoleLog(`[appendNewMessagesToViewer] Called with ${newMessages.length} new messages.`);
         const messagesContainer = document.getElementById('otk-messages-container');
         if (!messagesContainer) {
             consoleError("[appendNewMessagesToViewer] messagesContainer not found. Aborting append.");
-            // Potentially hide loading screen if it was shown by refreshThreadsAndMessages
             hideLoadingScreen();
             return;
         }
 
-        // oldScrollHeight is no longer passed directly, but we might need to know if user *was* at bottom.
-        // This check can be done in refreshThreadsAndMessages or approximated.
-        // For now, referenceElement approach will dominate if a reference is found.
-
-        if (messagesContainer.children.length > 0 && newMessages.length > 0) {
-            const separatorDiv = document.createElement('div');
-            separatorDiv.style.cssText = `
-                border-top: 2px dashed var(--otk-new-messages-divider-color);
-                margin: 20px 0; /* Keeps vertical spacing */
-                padding-top: 10px;
-                padding-bottom: 10px; /* Add some padding below the text as well */
-                padding-left: 15px; /* Indent text from the left */
-                text-align: left; /* Align text to the left */
-                color: var(--otk-new-messages-font-color);
-                font-size: 12px;
-                font-style: italic;
-                width: 100%; /* Ensure it spans the container if not already */
-                box-sizing: border-box; /* Include padding in width calculation */
-            `;
-            const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            separatorDiv.textContent = `--- ${currentTime} : ${newMessages.length} New Messages Loaded ---`;
-            messagesContainer.appendChild(separatorDiv);
-            consoleLog("[appendNewMessagesToViewer] Appended separator line.");
+        if (newMessages.length === 0) {
+            consoleLog("[appendNewMessagesToViewer] No new messages to append.");
+            hideLoadingScreen();
+            return;
         }
+
+        const newContentDiv = document.createElement('div');
+
+        const separatorDiv = document.createElement('div');
+        separatorDiv.style.cssText = `
+            border-top: 2px dashed var(--otk-new-messages-divider-color);
+            margin: 20px 0;
+            padding-top: 10px;
+            padding-bottom: 10px;
+            padding-left: 15px;
+            text-align: left;
+            color: var(--otk-new-messages-font-color);
+            font-size: 12px;
+            font-style: italic;
+            width: 100%;
+            box-sizing: border-box;
+        `;
+        const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        separatorDiv.textContent = `--- ${currentTime} : ${newMessages.length} New Messages Loaded ---`;
+        newContentDiv.appendChild(separatorDiv);
 
         const mediaLoadPromises = [];
         for (const message of newMessages) {
             const boardForLink = message.board || 'b';
-            const threadColor = getThreadColor(message.originalThreadId); // Get thread color for accent
-            // For messages directly appended to the viewer, isTopLevelMessage is true, currentDepth is 0, and parent is null
+            const threadColor = getThreadColor(message.originalThreadId);
             const messageElement = createMessageElementDOM(message, mediaLoadPromises, uniqueImageViewerHashes, boardForLink, true, 0, threadColor, null);
-            messagesContainer.appendChild(messageElement);
+            newContentDiv.appendChild(messageElement);
             renderedMessageIdsInViewer.add(message.id);
-            consoleLog(`[appendNewMessagesToViewer] Appended message ${message.id}.`);
         }
 
-        consoleLog(`[appendNewMessagesToViewer] Appended ${newMessages.length} elements. Waiting for media promises.`);
+        messagesContainer.appendChild(newContentDiv);
 
-        Promise.all(mediaLoadPromises).then(async () => { // Make async to use await for setTimeout promise
+        Promise.all(mediaLoadPromises).then(async () => {
             if (window.twttr && window.twttr.widgets) {
-                const tweetEmbeds = messagesContainer.querySelectorAll('.otk-tweet-embed');
+                const tweetEmbeds = newContentDiv.querySelectorAll('.otk-tweet-embed');
                 if (tweetEmbeds.length > 0) {
-                    consoleLog(`[Twitter] Found ${tweetEmbeds.length} new tweet embeds to render.`);
                     window.twttr.widgets.load(tweetEmbeds);
                 }
             }
-            consoleLog("[appendNewMessagesToViewer] Media promises resolved.");
+            hideLoadingScreen();
 
-            hideLoadingScreen(); // Hide loading screen first
-            await new Promise(resolve => setTimeout(resolve, 50)); // Brief pause for DOM to settle after hiding overlay
-
-            // Scroll adjustment logic is removed. The browser will maintain the current scroll position
-            // relative to the existing content. If new content is added at the bottom, the user
-            // will need to scroll down to see it if they weren't already at the bottom.
+            // Don't adjust scroll position
             consoleLog("[appendNewMessagesToViewer] Scroll position intentionally not adjusted after append.");
 
             viewerActiveImageCount = uniqueImageViewerHashes.size;
             viewerActiveVideoCount = viewerTopLevelAttachedVideoHashes.size + viewerTopLevelEmbedIds.size;
-            consoleLog(`[StatsDebug][appendNewMessagesToViewer] Viewer counts updated: Images=${viewerActiveImageCount}, Videos (top-level attached + top-level embed)=${viewerActiveVideoCount}`);
-            // Pass the calculated new counts to updateDisplayedStatistics
-            const newCounts = {
-                isBackgroundUpdate: true,
-                newMessagesCount: newMessages.length,
-                newImagesCount: newMessages.filter(m => m.attachment && ['.jpg', '.jpeg', '.png', '.gif'].includes(m.attachment.ext.toLowerCase())).length,
-                newVideosCount: newMessages.filter(m => m.attachment && ['.webm', '.mp4'].includes(m.attachment.ext.toLowerCase())).length
-            };
-            updateDisplayedStatistics(newCounts);
-            consoleLog("[appendNewMessagesToViewer] Stats updated.");
-
-        }).catch(async err => { // Make async
+            updateDisplayedStatistics();
+        }).catch(err => {
             consoleError("[appendNewMessagesToViewer] Error in media promises:", err);
-            hideLoadingScreen(); // Ensure loading screen is hidden on error too
-            // No scroll adjustment on error either with the new approach.
+            hideLoadingScreen();
         });
     }
 
@@ -3454,17 +3438,10 @@ function _populateAttachmentDivWithMedia(
             window.dispatchEvent(new CustomEvent('otkMessagesUpdated'));
             renderThreadList();
 
-            // Pass the calculated new counts to updateDisplayedStatistics
-            const newCounts = {
-                isBackgroundUpdate: isBackground,
-                newMessagesCount: newMessages.length,
-                newImagesCount: newMessages.filter(m => m.attachment && ['.jpg', '.jpeg', '.png', '.gif'].includes(m.attachment.ext.toLowerCase())).length,
-                newVideosCount: newMessages.filter(m => m.attachment && ['.webm', '.mp4'].includes(m.attachment.ext.toLowerCase())).length
-            };
-            updateDisplayedStatistics(newCounts);
+            updateDisplayedStatistics();
 
             if (isBackground && otkViewer && otkViewer.style.display === 'block' && newMessages.length > 0) {
-                // appendNewMessagesToViewer(newMessages);
+                // Do not append, just update the "(+N new)" stats
             }
 
             consoleLog('[BG] Background refresh complete.');
@@ -3600,28 +3577,7 @@ function _populateAttachmentDivWithMedia(
             updateLoadingProgress(95, "Finalizing data and updating display...");
             renderThreadList();
             window.dispatchEvent(new CustomEvent('otkMessagesUpdated'));
-            localStorage.removeItem('otkNewMessagesCount');
-            localStorage.removeItem('otkNewImagesCount');
-            localStorage.removeItem('otkNewVideosCount');
-            
-        // --- Begin Patch: Clear new message stats on manual refresh ---
-        localStorage.removeItem('otkNewMessagesCount');
-        localStorage.removeItem('otkNewImagesCount');
-        localStorage.removeItem('otkNewVideosCount');
-        updateDisplayedStatistics({
-            isBackgroundUpdate: false,
-            newMessagesCount: 0,
-            newImagesCount: 0,
-            newVideosCount: 0
-        });
-        // --- End Patch ---
-
-updateDisplayedStatistics({
-                isBackgroundUpdate: false, // This is a manual refresh
-                newMessagesCount: totalNewMessagesThisRefresh,
-                newImagesCount: totalNewImagesThisRefresh,
-                newVideosCount: totalNewVideosThisRefresh
-            });
+            updateDisplayedStatistics();
 
             // New logic for incremental append or full render
             const messagesContainer = document.getElementById('otk-messages-container'); // Still needed to check if viewer is open and has container
@@ -3734,9 +3690,6 @@ updateDisplayedStatistics({
             isManualRefreshInProgress = false;
             consoleLog('[Clear] Manual refresh flag reset.');
             renderThreadList(); // Update GUI bar with (now minimal) live threads
-            localStorage.removeItem('otkNewMessagesCount');
-            localStorage.removeItem('otkNewImagesCount');
-            localStorage.removeItem('otkNewVideosCount');
             updateDisplayedStatistics(); // Update stats based on cleared and re-fetched data
         }
     }
@@ -3815,145 +3768,151 @@ updateDisplayedStatistics({
                 otkViewer.classList.remove('otk-message-layout-newdesign');
             }
             // renderMessagesInViewer will calculate and set viewerActive counts and then call updateDisplayedStatistics
-            // renderMessagesInViewer({isToggleOpen: true}); // Pass flag
+            renderMessagesInViewer({isToggleOpen: true}); // Pass flag
         }
     }
 
-    function updateDisplayedStatistics(options = {}) {
-        const { isBackgroundUpdate = false, newMessagesCount = 0, newImagesCount = 0, newVideosCount = 0 } = options;
-
+    function updateDisplayedStatistics() {
         const threadsTrackedElem = document.getElementById('otk-threads-tracked-stat');
         const totalMessagesElem = document.getElementById('otk-total-messages-stat');
         const localImagesElem = document.getElementById('otk-local-images-stat');
         const localVideosElem = document.getElementById('otk-local-videos-stat');
 
-        if (threadsTrackedElem && totalMessagesElem && localImagesElem && localVideosElem) {
-            const liveThreadsCount = activeThreads.length;
-            let totalMessagesCount = 0;
-            for (const threadId in messagesByThreadId) {
-                if (messagesByThreadId.hasOwnProperty(threadId)) {
-                    totalMessagesCount += (messagesByThreadId[threadId] || []).length;
+        if (!threadsTrackedElem || !totalMessagesElem || !localImagesElem || !localVideosElem) {
+            consoleWarn('One or more statistics elements not found in GUI.');
+            return;
+        }
+
+        let totalMessagesInStorage = 0;
+        let totalImagesInStorage = 0;
+        let totalVideosInStorage = 0;
+
+        for (const threadId in messagesByThreadId) {
+            const messages = messagesByThreadId[threadId] || [];
+            totalMessagesInStorage += messages.length;
+            messages.forEach(msg => {
+                if (msg.attachment) {
+                    const ext = msg.attachment.ext.toLowerCase();
+                    if (['.jpg', '.jpeg', '.png', '.gif'].includes(ext)) {
+                        totalImagesInStorage++;
+                    } else if (['.webm', '.mp4'].includes(ext)) {
+                        totalVideosInStorage++;
+                    }
                 }
+            });
+        }
+
+        const mainMessagesCount = renderedMessageIdsInViewer.size;
+        const mainImagesCount = uniqueImageViewerHashes.size;
+        const mainVideosCount = viewerTopLevelAttachedVideoHashes.size + viewerTopLevelEmbedIds.size;
+
+        const newMessages = totalMessagesInStorage - mainMessagesCount;
+        const newImages = totalImagesInStorage - mainImagesCount;
+        const newVideos = totalVideosInStorage - mainVideosCount;
+
+        const liveThreadsCount = activeThreads.length;
+
+        const createStatLine = (baseText, newCount) => {
+            const lineContainer = document.createElement('div');
+            lineContainer.style.display = 'flex';
+            lineContainer.style.justifyContent = 'flex-start';
+            lineContainer.style.width = '100%';
+
+            const baseSpan = document.createElement('span');
+            baseSpan.textContent = baseText;
+
+            const newCountSpan = document.createElement('span');
+            newCountSpan.className = 'new-stat';
+            newCountSpan.style.color = 'var(--otk-background-updates-stats-text-color)';
+            newCountSpan.style.marginLeft = '5px';
+
+            if (newCount > 0) {
+                newCountSpan.textContent = `(+${newCount} new)`;
+            } else {
+                newCountSpan.textContent = '';
             }
 
-            // Create a stable container for the base text and the new count indicator
-            const createStatLine = (baseText, newCount, storageKey) => {
-                const lineContainer = document.createElement('div');
-                lineContainer.style.display = 'flex';
-                lineContainer.style.justifyContent = 'flex-start'; // Align items to the left
-                lineContainer.style.width = '100%'; // Ensure container takes full width of its parent cell
+            lineContainer.appendChild(baseSpan);
+            lineContainer.appendChild(newCountSpan);
+            return lineContainer;
+        };
 
-                const baseSpan = document.createElement('span');
-                baseSpan.textContent = baseText;
+        const paddingLength = 4;
+        threadsTrackedElem.innerHTML = '';
+        threadsTrackedElem.appendChild(createStatLine(`- ${padNumber(liveThreadsCount, paddingLength)} Live Thread${liveThreadsCount === 1 ? '' : 's'}`, 0));
 
-                const newCountSpan = document.createElement('span');
-                newCountSpan.className = 'new-stat';
-                newCountSpan.style.color = 'var(--otk-background-updates-stats-text-color)';
-                newCountSpan.style.marginLeft = '5px'; // Space between base and new text
+        totalMessagesElem.innerHTML = '';
+        totalMessagesElem.appendChild(createStatLine(`- ${padNumber(mainMessagesCount, paddingLength)} Total Message${mainMessagesCount === 1 ? '' : 's'}`, newMessages));
 
-                let newTotal = parseInt(localStorage.getItem(storageKey) || '0');
-                if (isBackgroundUpdate) {
-                    newTotal += newCount;
-                    localStorage.setItem(storageKey, newTotal);
+        localImagesElem.innerHTML = '';
+        localImagesElem.appendChild(createStatLine(`- ${padNumber(mainImagesCount, paddingLength)} Image${mainImagesCount === 1 ? '' : 's'}`, newImages));
+
+        localVideosElem.innerHTML = '';
+        localVideosElem.appendChild(createStatLine(`- ${padNumber(mainVideosCount, paddingLength)} Video${mainVideosCount === 1 ? '' : 's'}`, newVideos));
+    }
+
+    function createTrackerButton(text, id = null) {
+        const button = document.createElement('button');
+        if (id) button.id = id;
+        button.textContent = text;
+        button.classList.add('otk-tracker-button'); // Add a common class for potential shared base styles not from variables
+        button.style.cssText = `
+            padding: 5px 10px;
+            cursor: pointer;
+            background-color: var(--otk-button-bg-color);
+            color: var(--otk-button-text-color);
+            border: 1px solid var(--otk-button-border-color);
+            border-radius: 3px;
+            font-size: 13px;
+            white-space: nowrap; /* Prevent button text wrapping */
+            /* Transition for smooth background color change can be added here or in CSS */
+            transition: background-color 0.15s ease-in-out;
+        `;
+
+        button.addEventListener('mouseover', () => {
+            if (!button.disabled) { // Check if button is not disabled
+                button.classList.add('otk-button--hover');
+                // Fallback if CSS variables/classes somehow fail, or for non-variable parts of hover
+                // button.style.backgroundColor = 'var(--otk-button-hover-bg-color)'; // Direct application as fallback/override example
+            }
+        });
+        button.addEventListener('mouseout', () => {
+            if (!button.disabled) {
+                button.classList.remove('otk-button--hover');
+                button.classList.remove('otk-button--active'); // Ensure active is also removed if mouse leaves while pressed
+                // Fallback: reset to base color
+                // button.style.backgroundColor = 'var(--otk-button-bg-color)';
+            }
+        });
+        button.addEventListener('mousedown', () => {
+            if (!button.disabled) {
+                button.classList.add('otk-button--active');
+                // Fallback
+                // button.style.backgroundColor = 'var(--otk-button-active-bg-color)';
+            }
+        });
+        button.addEventListener('mouseup', () => {
+            if (!button.disabled) {
+                button.classList.remove('otk-button--active');
+                // If mouse is still over, hover effect should apply.
+                // If mouseup happens outside, mouseout would have cleared hover.
+                // If mouseup happens inside, it should revert to hover state if still over.
+                // The mouseout listener already handles removing active and hover if mouse leaves.
+                // So, if still over, ensure hover is present.
+                if (button.matches(':hover')) { // Check if mouse is still over the button
+                     button.classList.add('otk-button--hover');
                 }
-
-                if (newTotal > 0) {
-                    newCountSpan.textContent = `(+${newTotal} new)`;
-                } else {
-                    newCountSpan.textContent = ''; // Clear if no new items
-                }
-
-                lineContainer.appendChild(baseSpan);
-                lineContainer.appendChild(newCountSpan);
-                return lineContainer;
-            };
-
-            const paddingLength = 4;
-            threadsTrackedElem.innerHTML = ''; // Clear previous content
-            threadsTrackedElem.appendChild(createStatLine(`- ${padNumber(liveThreadsCount, paddingLength)} Live Thread${liveThreadsCount === 1 ? '' : 's'}`, 0, 'otkDummyKeyForThreads')); // No "new" count for threads
-
-            totalMessagesElem.innerHTML = '';
-            totalMessagesElem.appendChild(createStatLine(`- ${padNumber(totalMessagesCount, paddingLength)} Total Message${totalMessagesCount === 1 ? '' : 's'}`, newMessagesCount, 'otkNewMessagesCount'));
-
-            const imageCountFromStorage = parseInt(localStorage.getItem(LOCAL_IMAGE_COUNT_KEY) || '0');
-            const videoCountFromStorage = parseInt(localStorage.getItem(LOCAL_VIDEO_COUNT_KEY) || '0');
-
-            const imageCountToDisplay = viewerActiveImageCount !== null ? viewerActiveImageCount : imageCountFromStorage;
-            const videoCountToDisplay = viewerActiveVideoCount !== null ? viewerActiveVideoCount : videoCountFromStorage;
-
-            localImagesElem.innerHTML = '';
-            localImagesElem.appendChild(createStatLine(`- ${padNumber(imageCountToDisplay, paddingLength)} Image${imageCountToDisplay === 1 ? '' : 's'}`, newImagesCount, 'otkNewImagesCount'));
-
-            localVideosElem.innerHTML = '';
-            localVideosElem.appendChild(createStatLine(`- ${padNumber(videoCountToDisplay, paddingLength)} Video${videoCountToDisplay === 1 ? '' : 's'}`, newVideosCount, 'otkNewVideosCount'));
-
-        } else {
-            consoleWarn('One or more statistics elements not found in GUI. Threads, Messages, Images, or Videos.');
-        }
+                // Fallback
+                // if (button.matches(':hover')) button.style.backgroundColor = 'var(--otk-button-hover-bg-color)';
+                // else button.style.backgroundColor = 'var(--otk-button-bg-color)';
+            }
+        });
+        return button;
     }
 
     // --- Button Implementations & Event Listeners ---
     const buttonContainer = document.getElementById('otk-button-container');
     if (buttonContainer) {
-        function createTrackerButton(text, id = null) {
-            const button = document.createElement('button');
-            if (id) button.id = id;
-            button.textContent = text;
-            button.classList.add('otk-tracker-button'); // Add a common class for potential shared base styles not from variables
-            button.style.cssText = `
-                padding: 5px 10px;
-                cursor: pointer;
-                background-color: var(--otk-button-bg-color);
-                color: var(--otk-button-text-color);
-                border: 1px solid var(--otk-button-border-color);
-                border-radius: 3px;
-                font-size: 13px;
-                white-space: nowrap; /* Prevent button text wrapping */
-                /* Transition for smooth background color change can be added here or in CSS */
-                transition: background-color 0.15s ease-in-out;
-            `;
-
-            button.addEventListener('mouseover', () => {
-                if (!button.disabled) { // Check if button is not disabled
-                    button.classList.add('otk-button--hover');
-                    // Fallback if CSS variables/classes somehow fail, or for non-variable parts of hover
-                    // button.style.backgroundColor = 'var(--otk-button-hover-bg-color)'; // Direct application as fallback/override example
-                }
-            });
-            button.addEventListener('mouseout', () => {
-                if (!button.disabled) {
-                    button.classList.remove('otk-button--hover');
-                    button.classList.remove('otk-button--active'); // Ensure active is also removed if mouse leaves while pressed
-                    // Fallback: reset to base color
-                    // button.style.backgroundColor = 'var(--otk-button-bg-color)';
-                }
-            });
-            button.addEventListener('mousedown', () => {
-                if (!button.disabled) {
-                    button.classList.add('otk-button--active');
-                    // Fallback
-                    // button.style.backgroundColor = 'var(--otk-button-active-bg-color)';
-                }
-            });
-            button.addEventListener('mouseup', () => {
-                if (!button.disabled) {
-                    button.classList.remove('otk-button--active');
-                    // If mouse is still over, hover effect should apply.
-                    // If mouseup happens outside, mouseout would have cleared hover.
-                    // If mouseup happens inside, it should revert to hover state if still over.
-                    // The mouseout listener already handles removing active and hover if mouse leaves.
-                    // So, if still over, ensure hover is present.
-                    if (button.matches(':hover')) { // Check if mouse is still over the button
-                         button.classList.add('otk-button--hover');
-                    }
-                    // Fallback
-                    // if (button.matches(':hover')) button.style.backgroundColor = 'var(--otk-button-hover-bg-color)';
-                    // else button.style.backgroundColor = 'var(--otk-button-bg-color)';
-                }
-            });
-            return button;
-        }
-
         const btnToggleViewer = createTrackerButton('Toggle Viewer', 'otk-toggle-viewer-btn');
         btnToggleViewer.addEventListener('click', toggleViewer);
         // Appended to bottomRowContainer later
@@ -4215,15 +4174,27 @@ function handleIntersection(entries, observerInstance) {
 
 // --- Theme Settings Persistence ---
 const THEME_SETTINGS_KEY = 'otkThemeSettings';
+let pendingThemeChanges = {};
+
+function showApplyDiscardButtons() {
+    const applyBtn = document.getElementById('otk-apply-settings-btn');
+    const discardBtn = document.getElementById('otk-discard-settings-btn');
+    if (applyBtn) applyBtn.style.display = 'inline-block';
+    if (discardBtn) discardBtn.style.display = 'inline-block';
+}
+
+function hideApplyDiscardButtons() {
+    const applyBtn = document.getElementById('otk-apply-settings-btn');
+    const discardBtn = document.getElementById('otk-discard-settings-btn');
+    if (applyBtn) applyBtn.style.display = 'none';
+    if (discardBtn) discardBtn.style.display = 'none';
+}
 
 function forceViewerRerenderAfterThemeChange() {
     if (otkViewer && otkViewer.style.display === 'block') {
         renderedMessageIdsInViewer.clear();
         otkViewer.innerHTML = ''; // Clear the viewer content
 
-        // Ensure the correct layout class is applied before rendering
-        // This might be redundant if updateViewerLayoutMode also handles it,
-        // but explicit application here ensures the class is set based on the current theme state.
         const currentLayoutToggle = localStorage.getItem('otkMessageLayoutStyle') || 'default';
         if (currentLayoutToggle === 'new_design') {
             otkViewer.classList.add('otk-message-layout-newdesign');
@@ -4232,25 +4203,26 @@ function forceViewerRerenderAfterThemeChange() {
             otkViewer.classList.add('otk-message-layout-default');
             otkViewer.classList.remove('otk-message-layout-newdesign');
         }
-        // updateViewerLayoutMode(); // This function seems to be missing or was from a different context.
-                                 // If it's intended to re-apply layout classes based on theme,
-                                 // the logic above handles it. If it does more, it needs to be defined.
-                                 // For now, assuming the direct class manipulation is sufficient.
 
         renderMessagesInViewer({ isToggleOpen: true }); // Re-render all messages
         consoleLog("Viewer force re-rendered after theme change.");
     }
 }
 
-function saveThemeSetting(key, value) {
-    let settings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
-    if (value === null || value === undefined) {
-        delete settings[key];
+function saveThemeSetting(key, value, requiresRerender = false) {
+    if (requiresRerender) {
+        pendingThemeChanges[key] = value;
+        showApplyDiscardButtons();
     } else {
-        settings[key] = value;
+        let settings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
+        if (value === null || value === undefined) {
+            delete settings[key];
+        } else {
+            settings[key] = value;
+        }
+        localStorage.setItem(THEME_SETTINGS_KEY, JSON.stringify(settings));
+        consoleLog("Saved theme setting:", key, value);
     }
-    localStorage.setItem(THEME_SETTINGS_KEY, JSON.stringify(settings));
-    consoleLog("Saved theme setting:", key, value);
 }
 
 function applyThemeSettings() {
@@ -4548,6 +4520,23 @@ function setupOptionsWindow() {
     `;
     titleBar.textContent = 'Options'; // Changed title
 
+    const titleBarButtons = document.createElement('div');
+    titleBarButtons.style.display = 'flex';
+    titleBarButtons.style.alignItems = 'center';
+
+    const applyButton = createTrackerButton('Apply', 'otk-apply-settings-btn');
+    applyButton.style.display = 'none'; // Hidden by default
+    applyButton.style.marginRight = '10px';
+    titleBarButtons.appendChild(applyButton);
+
+    const discardButton = createTrackerButton('Discard', 'otk-discard-settings-btn');
+    discardButton.style.display = 'none'; // Hidden by default
+    discardButton.style.marginRight = '10px';
+    discardButton.style.backgroundColor = '#803333';
+    discardButton.onmouseover = () => discardButton.style.backgroundColor = '#a04444';
+    discardButton.onmouseout = () => discardButton.style.backgroundColor = '#803333';
+    titleBarButtons.appendChild(discardButton);
+
     const closeButton = document.createElement('span');
     closeButton.id = 'otk-options-close-btn';
     closeButton.innerHTML = '&#x2715;'; // 'X' character
@@ -4557,9 +4546,26 @@ function setupOptionsWindow() {
         padding: 0 5px;
     `;
     closeButton.title = "Close Settings";
+    titleBarButtons.appendChild(closeButton);
 
-    titleBar.appendChild(closeButton);
+    titleBar.appendChild(titleBarButtons);
     optionsWindow.appendChild(titleBar);
+
+    applyButton.addEventListener('click', () => {
+        let settings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
+        settings = { ...settings, ...pendingThemeChanges };
+        localStorage.setItem(THEME_SETTINGS_KEY, JSON.stringify(settings));
+        pendingThemeChanges = {};
+        hideApplyDiscardButtons();
+        applyThemeSettings();
+        forceViewerRerenderAfterThemeChange();
+    });
+
+    discardButton.addEventListener('click', () => {
+        pendingThemeChanges = {};
+        hideApplyDiscardButtons();
+        applyThemeSettings(); // Re-apply original settings to reset inputs
+    });
 
     const contentArea = document.createElement('div');
     contentArea.id = 'otk-options-content';
@@ -4819,8 +4825,7 @@ function setupOptionsWindow() {
         checkbox.checked = (savedValue !== null) ? (savedValue === 'true') : options.defaultValue;
 
         checkbox.addEventListener('change', () => {
-            saveThemeSetting(options.storageKey, checkbox.checked);
-            forceViewerRerenderAfterThemeChange(); // Re-render viewer to apply changes
+            saveThemeSetting(options.storageKey, checkbox.checked, options.requiresRerender);
         });
 
         controlsWrapperDiv.appendChild(checkbox);
@@ -5029,7 +5034,7 @@ function setupOptionsWindow() {
             } else {
                 mainInput.value = cssDefaultValue;
             }
-            saveThemeSetting(options.storageKey, null); // Save null to signify using default
+            saveThemeSetting(options.storageKey, null, options.requiresRerender);
             // If this is the cog icon color, update it directly
             if (options.storageKey === 'cogIconColor') {
                  const cogIcon = document.getElementById('otk-settings-cog');
@@ -5151,9 +5156,7 @@ function setupOptionsWindow() {
 
     messageLayoutDropdown.addEventListener('change', () => {
         const selectedLayout = messageLayoutDropdown.value;
-        localStorage.setItem(layoutSettingKey, selectedLayout);
-        consoleLog(`Message layout changed to: ${selectedLayout}`);
-        forceViewerRerenderAfterThemeChange();
+            saveThemeSetting(layoutSettingKey, selectedLayout, true);
     });
 
     layoutDropdownGroup.appendChild(layoutDropdownLabel);
@@ -5167,8 +5170,8 @@ function setupOptionsWindow() {
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "New Messages Text:", storageKey: 'newMessagesFontColor', cssVariable: '--otk-new-messages-font-color', defaultValue: '#FFD700', inputType: 'color', idSuffix: 'new-msg-font' }));
 
     // Anchor Highlight Colors
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Anchor Highlight Background:", storageKey: 'anchorHighlightBgColor', cssVariable: '--otk-anchor-highlight-bg-color', defaultValue: '#4a4a3a', inputType: 'color', idSuffix: 'anchor-bg' }));
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Anchor Highlight Border:", storageKey: 'anchorHighlightBorderColor', cssVariable: '--otk-anchor-highlight-border-color', defaultValue: '#FFD700', inputType: 'color', idSuffix: 'anchor-border' }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Anchor Highlight Background:", storageKey: 'anchorHighlightBgColor', cssVariable: '--otk-anchor-highlight-bg-color', defaultValue: '#4a4a3a', inputType: 'color', idSuffix: 'anchor-bg', requiresRerender: true }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Anchor Highlight Border:", storageKey: 'anchorHighlightBorderColor', cssVariable: '--otk-anchor-highlight-border-color', defaultValue: '#FFD700', inputType: 'color', idSuffix: 'anchor-border', requiresRerender: true }));
 
     const tweetEmbedModeGroup = document.createElement('div');
     tweetEmbedModeGroup.style.cssText = `
@@ -5216,8 +5219,7 @@ function setupOptionsWindow() {
     });
     tweetEmbedModeDropdown.value = localStorage.getItem(TWEET_EMBED_MODE_KEY) || 'default';
     tweetEmbedModeDropdown.addEventListener('change', () => {
-        localStorage.setItem(TWEET_EMBED_MODE_KEY, tweetEmbedModeDropdown.value);
-        forceViewerRerenderAfterThemeChange();
+        saveThemeSetting(TWEET_EMBED_MODE_KEY, tweetEmbedModeDropdown.value, true);
     });
     tweetEmbedModeGroup.appendChild(tweetEmbedModeLabel);
     tweetEmbedModeControlsWrapper.appendChild(tweetEmbedModeDropdown);
@@ -5234,39 +5236,39 @@ function setupOptionsWindow() {
     depth0MessagesHeading.style.marginTop = "22px";
     depth0MessagesHeading.style.marginBottom = "18px";
     themeOptionsContainer.appendChild(depth0MessagesHeading);
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Font Size (px):", storageKey: 'msgDepth0ContentFontSize', cssVariable: '--otk-msg-depth0-content-font-size', defaultValue: '13px', inputType: 'number', unit: 'px', min: 8, max: 24, idSuffix: 'msg-depth0-content-fontsize' }));
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Background:", storageKey: 'msgDepth0BgColor', cssVariable: '--otk-msg-depth0-bg-color', defaultValue: '#343434', inputType: 'color', idSuffix: 'msg-depth0-bg' })); // Default for original theme, new theme uses #fff
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Content Font:", storageKey: 'msgDepth0TextColor', cssVariable: '--otk-msg-depth0-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'msg-depth0-text' })); // Default for original theme, new theme uses #333
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Header Font:", storageKey: 'msgDepth0HeaderTextColor', cssVariable: '--otk-msg-depth0-header-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'msg-depth0-header-text' })); // Default for original theme, new theme uses #555
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Header Underline:", storageKey: 'viewerHeaderBorderColor', cssVariable: '--otk-viewer-header-border-color', defaultValue: '#000000', inputType: 'color', idSuffix: 'viewer-header-border' }));
-    themeOptionsContainer.appendChild(createCheckboxOptionRow({ labelText: "Hide Message Underline:", storageKey: 'otkMsgDepth0DisableHeaderUnderline', defaultValue: false, idSuffix: 'msg-depth0-disable-header-underline' }));
-    themeOptionsContainer.appendChild(createCheckboxOptionRow({ labelText: "Show Media Filenames:", storageKey: 'otkMsgDepth0DisplayMediaFilename', defaultValue: true, idSuffix: 'msg-depth0-display-media-filename' }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Font Size (px):", storageKey: 'msgDepth0ContentFontSize', cssVariable: '--otk-msg-depth0-content-font-size', defaultValue: '13px', inputType: 'number', unit: 'px', min: 8, max: 24, idSuffix: 'msg-depth0-content-fontsize', requiresRerender: true }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Background:", storageKey: 'msgDepth0BgColor', cssVariable: '--otk-msg-depth0-bg-color', defaultValue: '#343434', inputType: 'color', idSuffix: 'msg-depth0-bg', requiresRerender: true })); // Default for original theme, new theme uses #fff
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Content Font:", storageKey: 'msgDepth0TextColor', cssVariable: '--otk-msg-depth0-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'msg-depth0-text', requiresRerender: true })); // Default for original theme, new theme uses #333
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Header Font:", storageKey: 'msgDepth0HeaderTextColor', cssVariable: '--otk-msg-depth0-header-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'msg-depth0-header-text', requiresRerender: true })); // Default for original theme, new theme uses #555
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Header Underline:", storageKey: 'viewerHeaderBorderColor', cssVariable: '--otk-viewer-header-border-color', defaultValue: '#000000', inputType: 'color', idSuffix: 'viewer-header-border', requiresRerender: true }));
+    themeOptionsContainer.appendChild(createCheckboxOptionRow({ labelText: "Hide Message Underline:", storageKey: 'otkMsgDepth0DisableHeaderUnderline', defaultValue: false, idSuffix: 'msg-depth0-disable-header-underline', requiresRerender: true }));
+    themeOptionsContainer.appendChild(createCheckboxOptionRow({ labelText: "Show Media Filenames:", storageKey: 'otkMsgDepth0DisplayMediaFilename', defaultValue: true, idSuffix: 'msg-depth0-display-media-filename', requiresRerender: true }));
 
     // --- Depth 1 Messages Section ---
     const depth1MessagesHeading = createSectionHeading('Depth 1 Messages');
     depth1MessagesHeading.style.marginTop = "22px";
     depth1MessagesHeading.style.marginBottom = "18px";
     themeOptionsContainer.appendChild(depth1MessagesHeading);
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Font Size (px):", storageKey: 'msgDepth1ContentFontSize', cssVariable: '--otk-msg-depth1-content-font-size', defaultValue: '13px', inputType: 'number', unit: 'px', min: 8, max: 24, idSuffix: 'msg-depth1-content-fontsize' }));
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Background:", storageKey: 'msgDepth1BgColor', cssVariable: '--otk-msg-depth1-bg-color', defaultValue: '#525252', inputType: 'color', idSuffix: 'msg-depth1-bg' })); // Default for original theme
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Content Font:", storageKey: 'msgDepth1TextColor', cssVariable: '--otk-msg-depth1-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'msg-depth1-text' })); // Default for original theme
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Header Font:", storageKey: 'msgDepth1HeaderTextColor', cssVariable: '--otk-msg-depth1-header-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'msg-depth1-header-text' })); // Default for original theme
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Header Underline:", storageKey: 'viewerQuote1HeaderBorderColor', cssVariable: '--otk-viewer-quote1-header-border-color', defaultValue: '#000000', inputType: 'color', idSuffix: 'viewer-quote1-border' }));
-    themeOptionsContainer.appendChild(createCheckboxOptionRow({ labelText: "Hide Message Underline:", storageKey: 'otkMsgDepth1DisableHeaderUnderline', defaultValue: false, idSuffix: 'msg-depth1-disable-header-underline' }));
-    themeOptionsContainer.appendChild(createCheckboxOptionRow({ labelText: "Show Media Filenames:", storageKey: 'otkMsgDepth1DisplayMediaFilename', defaultValue: true, idSuffix: 'msg-depth1-display-media-filename' }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Font Size (px):", storageKey: 'msgDepth1ContentFontSize', cssVariable: '--otk-msg-depth1-content-font-size', defaultValue: '13px', inputType: 'number', unit: 'px', min: 8, max: 24, idSuffix: 'msg-depth1-content-fontsize', requiresRerender: true }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Background:", storageKey: 'msgDepth1BgColor', cssVariable: '--otk-msg-depth1-bg-color', defaultValue: '#525252', inputType: 'color', idSuffix: 'msg-depth1-bg', requiresRerender: true })); // Default for original theme
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Content Font:", storageKey: 'msgDepth1TextColor', cssVariable: '--otk-msg-depth1-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'msg-depth1-text', requiresRerender: true })); // Default for original theme
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Header Font:", storageKey: 'msgDepth1HeaderTextColor', cssVariable: '--otk-msg-depth1-header-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'msg-depth1-header-text', requiresRerender: true })); // Default for original theme
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Header Underline:", storageKey: 'viewerQuote1HeaderBorderColor', cssVariable: '--otk-viewer-quote1-header-border-color', defaultValue: '#000000', inputType: 'color', idSuffix: 'viewer-quote1-border', requiresRerender: true }));
+    themeOptionsContainer.appendChild(createCheckboxOptionRow({ labelText: "Hide Message Underline:", storageKey: 'otkMsgDepth1DisableHeaderUnderline', defaultValue: false, idSuffix: 'msg-depth1-disable-header-underline', requiresRerender: true }));
+    themeOptionsContainer.appendChild(createCheckboxOptionRow({ labelText: "Show Media Filenames:", storageKey: 'otkMsgDepth1DisplayMediaFilename', defaultValue: true, idSuffix: 'msg-depth1-display-media-filename', requiresRerender: true }));
 
     // --- Depth 2+ Messages Section ---
     const depth2plusMessagesHeading = createSectionHeading('Depth 2+ Messages');
     depth2plusMessagesHeading.style.marginTop = "22px";
     depth2plusMessagesHeading.style.marginBottom = "18px";
     themeOptionsContainer.appendChild(depth2plusMessagesHeading);
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Font Size (px):", storageKey: 'msgDepth2plusContentFontSize', cssVariable: '--otk-msg-depth2plus-content-font-size', defaultValue: '13px', inputType: 'number', unit: 'px', min: 8, max: 24, idSuffix: 'msg-depth2plus-content-fontsize' }));
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Background:", storageKey: 'msgDepth2plusBgColor', cssVariable: '--otk-msg-depth2plus-bg-color', defaultValue: '#484848', inputType: 'color', idSuffix: 'msg-depth2plus-bg' })); // Default for original theme
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Content Font:", storageKey: 'msgDepth2plusTextColor', cssVariable: '--otk-msg-depth2plus-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'msg-depth2plus-text' })); // Default for original theme
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Header Font:", storageKey: 'msgDepth2plusHeaderTextColor', cssVariable: '--otk-msg-depth2plus-header-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'msg-depth2plus-header-text' })); // Default for original theme
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Header Underline:", storageKey: 'viewerQuote2plusHeaderBorderColor', cssVariable: '--otk-viewer-quote2plus-header-border-color', defaultValue: '#000000', inputType: 'color', idSuffix: 'viewer-quote2plus-border' }));
-    themeOptionsContainer.appendChild(createCheckboxOptionRow({ labelText: "Hide Message Underline:", storageKey: 'otkMsgDepth2plusDisableHeaderUnderline', defaultValue: false, idSuffix: 'msg-depth2plus-disable-header-underline' }));
-    themeOptionsContainer.appendChild(createCheckboxOptionRow({ labelText: "Show Media Filenames:", storageKey: 'otkMsgDepth2plusDisplayMediaFilename', defaultValue: true, idSuffix: 'msg-depth2plus-display-media-filename' }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Font Size (px):", storageKey: 'msgDepth2plusContentFontSize', cssVariable: '--otk-msg-depth2plus-content-font-size', defaultValue: '13px', inputType: 'number', unit: 'px', min: 8, max: 24, idSuffix: 'msg-depth2plus-content-fontsize', requiresRerender: true }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Background:", storageKey: 'msgDepth2plusBgColor', cssVariable: '--otk-msg-depth2plus-bg-color', defaultValue: '#484848', inputType: 'color', idSuffix: 'msg-depth2plus-bg', requiresRerender: true })); // Default for original theme
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Content Font:", storageKey: 'msgDepth2plusTextColor', cssVariable: '--otk-msg-depth2plus-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'msg-depth2plus-text', requiresRerender: true })); // Default for original theme
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Header Font:", storageKey: 'msgDepth2plusHeaderTextColor', cssVariable: '--otk-msg-depth2plus-header-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'msg-depth2plus-header-text', requiresRerender: true })); // Default for original theme
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Header Underline:", storageKey: 'viewerQuote2plusHeaderBorderColor', cssVariable: '--otk-viewer-quote2plus-header-border-color', defaultValue: '#000000', inputType: 'color', idSuffix: 'viewer-quote2plus-border', requiresRerender: true }));
+    themeOptionsContainer.appendChild(createCheckboxOptionRow({ labelText: "Hide Message Underline:", storageKey: 'otkMsgDepth2plusDisableHeaderUnderline', defaultValue: false, idSuffix: 'msg-depth2plus-disable-header-underline', requiresRerender: true }));
+    themeOptionsContainer.appendChild(createCheckboxOptionRow({ labelText: "Show Media Filenames:", storageKey: 'otkMsgDepth2plusDisplayMediaFilename', defaultValue: true, idSuffix: 'msg-depth2plus-display-media-filename', requiresRerender: true }));
 
     // --- Options Panel Section ---
     const optionsPanelSectionHeading = createSectionHeading('Options Panel');
@@ -5842,10 +5844,6 @@ async function main() {
             /* The --otk-newdesign-msg-depthX... variables are removed as we will directly use the shared --otk-msg-depthX... vars */
         }
 
-        /* ADD THIS NEW RULE HERE */
-        #otk-stats-wrapper {
-            align-items: center !important; /* Center align the title and the stats block */
-        }
         /* --- New Design Specific Styles --- */
         #otk-viewer.otk-message-layout-newdesign { /* Target otkViewer when new design is active */
             background-color: var(--otk-newdesign-viewer-bg-color);
