@@ -4534,6 +4534,10 @@ function startTweetEmbedBackupSystem() {
                 if (window.twttr && window.twttr.widgets) {
                     window.twttr.widgets.load(embed);
                 }
+            } else if (!iframe && !blockquote && embed.dataset.tweetId) {
+                // If the embed is completely empty, but we still have the tweet ID, re-process it.
+                consoleLog(`[TweetBackup] Found completely empty tweet embed (${embed.dataset.tweetId}). Retrying render.`);
+                processTweetEmbed(embed);
             }
         });
     }, 3000); // Check every 3 seconds
@@ -4550,15 +4554,10 @@ function processTweetEmbed(embedContainer) {
 
     const renderAndLoadTweet = (html) => {
         embedContainer.innerHTML = html;
-        if (window.twttr && window.twttr.ready) {
-            window.twttr.ready(function (twttr) {
-                twttr.widgets.load(embedContainer).then(el => {
-                    if (!el) {
-                        consoleWarn(`Tweet widget load failed for ${tweetId}. Will be retried by backup system.`);
-                    }
-                });
-            });
-        }
+        const script = document.createElement("script");
+        script.src = "https://platform.twitter.com/widgets.js";
+        script.async = true;
+        embedContainer.appendChild(script);
     };
 
     const embedUrl = `https://publish.x.com/oembed?url=https://twitter.com/any/status/${tweetId}&theme=${embedMode}&omit_script=true`;
@@ -4571,6 +4570,10 @@ function processTweetEmbed(embedContainer) {
             url: embedUrl,
             onload: function(response) {
                 try {
+                    if (response.status === 404) {
+                        embedContainer.textContent = "[Tweet not found]";
+                        return;
+                    }
                     const data = JSON.parse(response.responseText);
                     if (data.html) {
                         renderAndLoadTweet(data.html);
@@ -4610,26 +4613,20 @@ function processTweetEmbed(embedContainer) {
 function handleIntersection(entries, observerInstance) {
     entries.forEach(entry => {
         const wrapper = entry.target;
-        const isTweet = wrapper.classList.contains('otk-tweet-embed-wrapper');
         const iframe = wrapper.querySelector('iframe');
 
         if (entry.isIntersecting) {
             // Element is now visible
             wrapper.style.display = ''; // Restore display
-            if (isTweet) {
-                if (!iframe) {
-                    processTweetEmbed(wrapper);
-                }
-            } else if (iframe && iframe.dataset.src && (!iframe.src || iframe.src === 'about:blank')) {
+            if (wrapper.classList.contains('otk-tweet-embed-wrapper') && !iframe) {
+                processTweetEmbed(wrapper);
+            } else if (iframe && iframe.dataset.src && (!iframe.src || iframe.src === 'about:blank') && !wrapper.classList.contains('otk-tweet-embed-wrapper')) {
                 console.log('[LazyLoad] Iframe is intersecting, loading src:', iframe.dataset.src);
                 iframe.src = iframe.dataset.src;
             }
         } else {
             // Element is no longer visible
-            if (isTweet) {
-                // Don't unload tweets, just hide them
-                wrapper.style.display = 'none';
-            } else if (iframe && iframe.src && iframe.src !== 'about:blank') {
+            if (iframe && iframe.src && iframe.src !== 'about:blank' && !wrapper.classList.contains('otk-tweet-embed-wrapper')) {
                 console.log('[LazyLoad] Iframe is no longer intersecting, unloading src:', iframe.src);
                 if (iframe.contentWindow && iframe.src.includes("youtube.com/embed")) {
                     try {
@@ -4639,8 +4636,6 @@ function handleIntersection(entries, observerInstance) {
                     }
                 }
                 iframe.src = 'about:blank';
-                // Hide the wrapper to collapse the space
-                wrapper.style.display = 'none';
             }
         }
     });
@@ -6698,11 +6693,7 @@ async function main() {
         }
     });
 
-    // Load Twitter widget script once
-    const script = document.createElement("script");
-    script.src = "https://platform.twitter.com/widgets.js";
-    script.async = true;
-    document.head.appendChild(script);
+    // The Twitter widget script is now loaded dynamically in processTweetEmbed.
 
     window.addEventListener('scroll', () => {
         if (scrollTimeout) {
