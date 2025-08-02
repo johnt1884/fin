@@ -13,6 +13,14 @@
 (function () {
     'use strict';
 
+let statAnimationFrameId = null;
+let tabHidden = false;
+let statAnimationTimers = [];
+
+document.addEventListener("visibilitychange", () => {
+  tabHidden = document.hidden;
+});
+
     // Constants for storage keys
     const THREADS_KEY = 'otkActiveThreads';
     const MESSAGES_KEY = 'otkMessagesByThreadId';
@@ -828,7 +836,6 @@ function createTweetEmbedElement(tweetId) {
             margin-left: 10px;
             cursor: pointer;
             display: inline-block;
-            vertical-align: middle;
             color: var(--otk-cog-icon-color);
         `;
         cogIcon.title = "Open Settings";
@@ -836,12 +843,25 @@ function createTweetEmbedElement(tweetId) {
         const titleContainer = document.createElement('div');
         titleContainer.style.cssText = `
             display: flex;
-            align-items: center;
+            align-items: baseline;
             justify-content: flex-start; /* Left-align title and cog */
             margin-bottom: 4px;
         `;
         titleContainer.appendChild(otkThreadTitleDisplay);
         titleContainer.appendChild(cogIcon);
+
+        const clockIcon = document.createElement('span');
+        clockIcon.id = 'otk-clock-icon';
+        clockIcon.innerHTML = '&#128337;';
+        clockIcon.style.cssText = `
+            font-size: 16px;
+            margin-left: 10px;
+            cursor: pointer;
+            display: inline-block;
+            color: var(--otk-cog-icon-color);
+        `;
+        clockIcon.title = "Toggle Clock";
+        titleContainer.appendChild(clockIcon);
 
         const otkStatsDisplay = document.createElement('div');
         otkStatsDisplay.id = 'otk-stats-display';
@@ -1165,7 +1185,46 @@ function createTweetEmbedElement(tweetId) {
     consoleLog('Initialized activeThreads from localStorage:', activeThreads);
 
 
-    // --- Utility functions ---
+    // (+n) Stat Update Logic
+function resetPlusN() {
+  const el = document.querySelector('.z-stats .z-new');
+  if (el) {
+    el.textContent = '';
+    el.style.opacity = '0';
+    el.classList.remove('active');
+  }
+  if (statAnimationFrameId) {
+    cancelAnimationFrame(statAnimationFrameId);
+    statAnimationFrameId = null;
+  }
+}
+
+function animateStatIncrease(statEl, plusNEl, from, to) {
+  const duration = 600;
+  const start = performance.now();
+
+  plusNEl.textContent = `+${to - from}`;
+  plusNEl.style.opacity = '1';
+  plusNEl.classList.add('active');
+
+  function animate(time) {
+    const progress = Math.min(1, (time - start) / duration);
+    const currentVal = Math.floor(from + (to - from) * progress);
+    statEl.textContent = currentVal;
+
+    if (progress < 1) {
+      statAnimationFrameId = requestAnimationFrame(animate);
+    } else {
+      statEl.textContent = to;
+      setTimeout(resetPlusN, 1200);
+      statAnimationFrameId = null;
+    }
+  }
+
+  statAnimationFrameId = requestAnimationFrame(animate);
+}
+
+// --- Utility functions ---
     function blobToDataURL(blob) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -1462,7 +1521,7 @@ function createTweetEmbedElement(tweetId) {
                 }
 
                 renderThreadList();
-                updateDisplayedStatistics();
+        updateDisplayedStatistics(false);
             });
 
             textContentDiv.appendChild(titleTimeContainer);
@@ -1771,7 +1830,7 @@ consoleLog(`[StatsDebug] Unique image hashes for viewer: ${uniqueImageViewerHash
     viewerActiveImageCount = uniqueImageViewerHashes.size;
     viewerActiveVideoCount = viewerTopLevelAttachedVideoHashes.size + viewerTopLevelEmbedIds.size;
     consoleLog(`[StatsDebug] Viewer counts updated: Images=${viewerActiveImageCount}, Videos (top-level attached + top-level embed)=${viewerActiveVideoCount}`);
-    updateDisplayedStatistics(); // Update stats after all media processing is attempted.
+updateDisplayedStatistics(false); // Update stats after all media processing is attempted.
 
             let anchorScrolled = false;
             const storedAnchoredInstanceId = localStorage.getItem(ANCHORED_MESSAGE_ID_KEY);
@@ -2456,7 +2515,7 @@ function _populateAttachmentDivWithMedia(
                                             localStorage.setItem(SEEN_EMBED_URL_IDS_KEY, JSON.stringify(seenEmbeds));
                                             let currentVideoCount = parseInt(localStorage.getItem(LOCAL_VIDEO_COUNT_KEY) || '0');
                                             localStorage.setItem(LOCAL_VIDEO_COUNT_KEY, (currentVideoCount + 1).toString());
-                                            updateDisplayedStatistics();
+                                    updateDisplayedStatistics(false);
                                         }
                                     }
                                     textElement.appendChild(createKickEmbedElement(clipId));
@@ -2616,7 +2675,7 @@ function _populateAttachmentDivWithMedia(
                                                 localStorage.setItem(SEEN_EMBED_URL_IDS_KEY, JSON.stringify(seenEmbeds));
                                                 let currentVideoCount = parseInt(localStorage.getItem(LOCAL_VIDEO_COUNT_KEY) || '0');
                                                 localStorage.setItem(LOCAL_VIDEO_COUNT_KEY, (currentVideoCount + 1).toString());
-                                                updateDisplayedStatistics();
+                                        updateDisplayedStatistics(false);
                                             }
                                         }
                                         textElement.appendChild(embedElement);
@@ -2957,7 +3016,7 @@ function _populateAttachmentDivWithMedia(
                                             localStorage.setItem(SEEN_EMBED_URL_IDS_KEY, JSON.stringify(seenEmbeds));
                                             let currentVideoCount = parseInt(localStorage.getItem(LOCAL_VIDEO_COUNT_KEY) || '0');
                                             localStorage.setItem(LOCAL_VIDEO_COUNT_KEY, (currentVideoCount + 1).toString());
-                                            updateDisplayedStatistics(); // This updates global, not viewer-specific directly
+                                    updateDisplayedStatistics(false); // This updates global, not viewer-specific directly
                                         }
                                     }
                                     textElement.appendChild(createYouTubeEmbedElement(videoId, timestampStr));
@@ -2990,7 +3049,7 @@ function _populateAttachmentDivWithMedia(
                                             localStorage.setItem(SEEN_EMBED_URL_IDS_KEY, JSON.stringify(seenEmbeds));
                                             let currentVideoCount = parseInt(localStorage.getItem(LOCAL_VIDEO_COUNT_KEY) || '0');
                                             localStorage.setItem(LOCAL_VIDEO_COUNT_KEY, (currentVideoCount + 1).toString());
-                                            updateDisplayedStatistics();
+                                    updateDisplayedStatistics(false);
                                         }
                                     }
                                     textElement.appendChild(createTwitchEmbedElement(patternObj.type, id, timestampStr));
@@ -3015,7 +3074,7 @@ function _populateAttachmentDivWithMedia(
                                             localStorage.setItem(SEEN_EMBED_URL_IDS_KEY, JSON.stringify(seenEmbeds));
                                             let currentVideoCount = parseInt(localStorage.getItem(LOCAL_VIDEO_COUNT_KEY) || '0');
                                             localStorage.setItem(LOCAL_VIDEO_COUNT_KEY, (currentVideoCount + 1).toString());
-                                            updateDisplayedStatistics();
+                                    updateDisplayedStatistics(false);
                                         }
                                     }
                                     textElement.appendChild(createTikTokEmbedElement(videoId));
@@ -3042,7 +3101,7 @@ function _populateAttachmentDivWithMedia(
                                             localStorage.setItem(SEEN_EMBED_URL_IDS_KEY, JSON.stringify(seenEmbeds));
                                             let currentVideoCount = parseInt(localStorage.getItem(LOCAL_VIDEO_COUNT_KEY) || '0');
                                             localStorage.setItem(LOCAL_VIDEO_COUNT_KEY, (currentVideoCount + 1).toString());
-                                            updateDisplayedStatistics();
+                                    updateDisplayedStatistics(false);
                                         }
                                     }
                                     textElement.appendChild(createStreamableEmbedElement(videoId));
@@ -3175,7 +3234,7 @@ function _populateAttachmentDivWithMedia(
                                             localStorage.setItem(SEEN_EMBED_URL_IDS_KEY, JSON.stringify(seenEmbeds));
                                             let currentVideoCount = parseInt(localStorage.getItem(LOCAL_VIDEO_COUNT_KEY) || '0');
                                             localStorage.setItem(LOCAL_VIDEO_COUNT_KEY, (currentVideoCount + 1).toString());
-                                            updateDisplayedStatistics();
+                                    updateDisplayedStatistics(false);
                                         }
                                     }
                                     textElement.appendChild(embedElement);
@@ -3814,7 +3873,7 @@ function _populateAttachmentDivWithMedia(
             consoleLog('[BG] Manual refresh in progress, skipping background refresh.');
             return;
         }
-        consoleLog('[BG] Performing background refresh...');
+        consoleLog('[BG] Performing background refresh...', { isBackground, options });
         try {
             consoleLog('[BG] Calling scanCatalog...');
             const foundThreads = await scanCatalog();
@@ -3943,7 +4002,7 @@ function _populateAttachmentDivWithMedia(
             localStorage.setItem('otkNewImagesCount', accumulatedNewImages);
             localStorage.setItem('otkNewVideosCount', accumulatedNewVideos);
 
-            updateDisplayedStatistics();
+            updateDisplayedStatistics(isBackground);
 
             if (isBackground && newMessages.length > 0) {
                 // When a background refresh happens, we should not add new content to the viewer.
@@ -4024,7 +4083,8 @@ function _populateAttachmentDivWithMedia(
     async function refreshThreadsAndMessages(options = {}) { // Manual Refresh / Called by Clear
         const { skipViewerUpdate = false } = options; // Destructure with default
 
-        consoleLog('[Manual] Refreshing threads and messages...');
+        resetStatAnimations();
+        consoleLog('[Manual] Refreshing threads and messages...', { options });
         isManualRefreshInProgress = true;
         showLoadingScreen("Initializing refresh..."); // Initial message
         try {
@@ -4247,7 +4307,7 @@ function _populateAttachmentDivWithMedia(
              consoleLog(`[Manual Refresh] Resync complete. Snapshot counts: ${renderedMessageIdsInViewer.size} msgs, ${uniqueImageViewerHashes.size} imgs, ${viewerTopLevelAttachedVideoHashes.size + viewerTopLevelEmbedIds.size} videos.`);
         }
 
-            updateDisplayedStatistics();
+            updateDisplayedStatistics(false);
 
             // New logic for incremental append or full render
             const messagesContainer = document.getElementById('otk-messages-container'); // Still needed to check if viewer is open and has container
@@ -4294,6 +4354,7 @@ function _populateAttachmentDivWithMedia(
 
     async function clearAndRefresh() {
         consoleLog('[Clear] Clear and Refresh initiated...');
+        resetStatAnimations();
         const viewerWasOpen = otkViewer && otkViewer.style.display === 'block';
 
         // Clear viewer content and related state immediately if viewer was open
@@ -4466,6 +4527,20 @@ function _populateAttachmentDivWithMedia(
         }
     }
 
+    function resetStatAnimations() {
+        // Stop all active animation timers
+        statAnimationTimers.forEach(timerId => clearInterval(timerId));
+        statAnimationTimers = []; // Clear the array
+
+        // Hide the (+n) elements
+        const newStatSpans = document.querySelectorAll('.new-stat');
+        newStatSpans.forEach(span => {
+            span.textContent = '';
+        });
+
+        consoleLog('All stat animations have been reset.');
+    }
+
     function animateStat(element, startValue, targetValue) {
         const diff = targetValue - startValue;
         if (diff <= 0) {
@@ -4474,6 +4549,11 @@ function _populateAttachmentDivWithMedia(
             } else {
                 element.textContent = '';
             }
+            return;
+        }
+
+        if (tabHidden) {
+            element.textContent = `(+${targetValue} new)`;
             return;
         }
 
@@ -4486,11 +4566,13 @@ function _populateAttachmentDivWithMedia(
             element.textContent = `(+${current} new)`;
             if (current >= targetValue) {
                 clearInterval(timer);
+                statAnimationTimers = statAnimationTimers.filter(t => t !== timer);
             }
         }, stepTime);
+        statAnimationTimers.push(timer);
     }
 
-    function updateDisplayedStatistics() {
+    function updateDisplayedStatistics(isBackgroundUpdate = false) {
         const threadsTrackedElem = document.getElementById('otk-threads-tracked-stat');
         const totalMessagesElem = document.getElementById('otk-total-messages-stat');
         const localImagesElem = document.getElementById('otk-local-images-stat');
@@ -4568,7 +4650,13 @@ function _populateAttachmentDivWithMedia(
 
             const newCountSpan = document.getElementById(`otk-stat-new-${id}`);
             if (newCount > 0) {
-                animateStat(newCountSpan, startCount, newCount);
+                if (isBackgroundUpdate) {
+                    animateStat(newCountSpan, startCount, newCount);
+                } else {
+                    newCountSpan.textContent = `(+${newCount} new)`;
+                }
+            } else {
+                newCountSpan.textContent = ''; // Explicitly clear if no new items
             }
         };
 
@@ -4639,6 +4727,23 @@ function _populateAttachmentDivWithMedia(
     }
 
     // --- Button Implementations & Event Listeners ---
+    const clockElement = document.createElement('div');
+    clockElement.id = 'otk-clock';
+    clockElement.style.cssText = `
+        position: fixed;
+        top: 86px;
+        right: 10px;
+        background-color: var(--otk-gui-bg-color);
+        color: var(--otk-gui-text-color);
+        padding: 5px;
+        border: 1px solid var(--otk-gui-bottom-border-color);
+        border-top: none;
+        border-radius: 0 0 5px 5px;
+        z-index: 10000;
+        display: none;
+    `;
+    document.body.appendChild(clockElement);
+
     const buttonContainer = document.getElementById('otk-button-container');
     if (buttonContainer) {
         const btnToggleViewer = createTrackerButton('Toggle Viewer', 'otk-toggle-viewer-btn');
@@ -4860,11 +4965,6 @@ function _populateAttachmentDivWithMedia(
             const nextUpdateTimestamp = Date.now() + refreshIntervalMs;
             localStorage.setItem('otkNextUpdateTimestamp', nextUpdateTimestamp);
 
-            const lastUpdateTimestamp = parseInt(localStorage.getItem('otkNextUpdateTimestamp') || '0', 10);
-            if (Date.now() > lastUpdateTimestamp) {
-                refreshIntervalMs = 0;
-            }
-
 
             backgroundRefreshIntervalId = setTimeout(() => {
                 if (isSuspended) {
@@ -4898,6 +4998,21 @@ function _populateAttachmentDivWithMedia(
             consoleLog('Background refresh stopped.');
         } else {
             consoleLog('Background refresh was not running.');
+        }
+    }
+
+    function updateClock() {
+        const clockElement = document.getElementById('otk-clock');
+        if (clockElement) {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', {
+                timeZone: 'America/Chicago',
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            clockElement.textContent = `${timeString} CDT`;
         }
     }
 
@@ -7221,6 +7336,18 @@ async function main() {
             consoleWarn('[Final Check] centerInfoContainer not found for flex-grow check.');
         }
     });
+
+    const clockIcon = document.getElementById('otk-clock-icon');
+    if (clockIcon) {
+        clockIcon.addEventListener('click', () => {
+            const clockElement = document.getElementById('otk-clock');
+            if (clockElement) {
+                clockElement.style.display = clockElement.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+    }
+
+    setInterval(updateClock, 1000);
 
     function handleActivity() {
         if (scrollTimeout) {
