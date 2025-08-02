@@ -4733,16 +4733,71 @@ function _populateAttachmentDivWithMedia(
         position: fixed;
         top: 86px;
         right: 10px;
-        background-color: var(--otk-gui-bg-color);
-        color: var(--otk-gui-text-color);
+        background-color: var(--otk-clock-bg-color, var(--otk-gui-bg-color));
+        color: var(--otk-clock-text-color, var(--otk-gui-text-color));
         padding: 5px;
         border: 1px solid var(--otk-gui-bottom-border-color);
         border-top: none;
         border-radius: 0 0 5px 5px;
         z-index: 10000;
         display: none;
+        cursor: move;
     `;
     document.body.appendChild(clockElement);
+
+    // Make clock draggable
+    let isClockDragging = false;
+    let clockOffsetX, clockOffsetY;
+
+    // Load saved clock position
+    const CLOCK_POSITION_KEY = 'otkClockPosition';
+    try {
+        const savedClockPos = JSON.parse(localStorage.getItem(CLOCK_POSITION_KEY));
+        if (savedClockPos && savedClockPos.top && savedClockPos.left) {
+            clockElement.style.top = savedClockPos.top;
+            clockElement.style.left = savedClockPos.left;
+            clockElement.style.right = 'auto';
+        }
+    } catch (e) {
+        consoleError("Error parsing saved clock position from localStorage:", e);
+    }
+
+
+    clockElement.addEventListener('mousedown', (e) => {
+        isClockDragging = true;
+        clockOffsetX = e.clientX - clockElement.offsetLeft;
+        clockOffsetY = e.clientY - clockElement.offsetTop;
+        clockElement.style.userSelect = 'none';
+        document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (isClockDragging) {
+            let newLeft = e.clientX - clockOffsetX;
+            let newTop = e.clientY - clockOffsetY;
+
+            const buffer = 10;
+            const maxLeft = window.innerWidth - clockElement.offsetWidth - buffer;
+            const maxTop = window.innerHeight - clockElement.offsetHeight - buffer;
+
+            newLeft = Math.max(buffer, Math.min(newLeft, maxLeft));
+            newTop = Math.max(buffer, Math.min(newTop, maxTop));
+
+            clockElement.style.left = newLeft + 'px';
+            clockElement.style.top = newTop + 'px';
+            clockElement.style.right = 'auto';
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isClockDragging) {
+            isClockDragging = false;
+            clockElement.style.userSelect = '';
+            document.body.style.userSelect = '';
+            // Save position to localStorage
+            localStorage.setItem(CLOCK_POSITION_KEY, JSON.stringify({top: clockElement.style.top, left: clockElement.style.left}));
+        }
+    });
 
     const buttonContainer = document.getElementById('otk-button-container');
     if (buttonContainer) {
@@ -5394,6 +5449,16 @@ function applyThemeSettings() {
     if (settings.blurIconBgColor) {
         document.documentElement.style.setProperty('--otk-blur-icon-bg-color', settings.blurIconBgColor);
         updateColorInputs('blur-icon-bg', settings.blurIconBgColor);
+    }
+
+    // Clock Colors
+    if (settings.clockBgColor) {
+        document.documentElement.style.setProperty('--otk-clock-bg-color', settings.clockBgColor);
+        updateColorInputs('clock-bg', settings.clockBgColor);
+    }
+    if (settings.clockTextColor) {
+        document.documentElement.style.setProperty('--otk-clock-text-color', settings.clockTextColor);
+        updateColorInputs('clock-text', settings.clockTextColor);
     }
 
     // GUI Button Colors
@@ -6519,7 +6584,14 @@ function setupOptionsWindow() {
     optionsPanelSectionHeading.style.marginBottom = "18px"; // Increased bottom margin
     themeOptionsContainer.appendChild(optionsPanelSectionHeading);
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Panel Text:", storageKey: 'optionsTextColor', cssVariable: '--otk-options-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'options-text' }));
-    // themeOptionsContainer.appendChild(createDivider()); // Removed divider
+
+    // --- Clock Section ---
+    const clockSectionHeading = createSectionHeading('Clock');
+    clockSectionHeading.style.marginTop = "22px";
+    clockSectionHeading.style.marginBottom = "18px";
+    themeOptionsContainer.appendChild(clockSectionHeading);
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Background:", storageKey: 'clockBgColor', cssVariable: '--otk-clock-bg-color', defaultValue: '#181818', inputType: 'color', idSuffix: 'clock-bg' }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Text:", storageKey: 'clockTextColor', cssVariable: '--otk-clock-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'clock-text' }));
 
     // --- Loading Screen Sub-Section (within Theme) ---
     const loadingScreenSubHeading = document.createElement('h6');
@@ -6854,7 +6926,11 @@ function setupOptionsWindow() {
             { storageKey: 'loadingTextColor', cssVariable: '--otk-loading-text-color', defaultValue: '#ffffff', inputType: 'color', idSuffix: 'loading-text' },
             { storageKey: 'loadingProgressBarBgColor', cssVariable: '--otk-loading-progress-bar-bg-color', defaultValue: '#333333', inputType: 'color', idSuffix: 'loading-progress-bg' },
             { storageKey: 'loadingProgressBarFillColor', cssVariable: '--otk-loading-progress-bar-fill-color', defaultValue: '#4CAF50', inputType: 'color', idSuffix: 'loading-progress-fill' },
-            { storageKey: 'loadingProgressBarTextColor', cssVariable: '--otk-loading-progress-bar-text-color', defaultValue: '#ffffff', inputType: 'color', idSuffix: 'loading-progress-text' }
+            { storageKey: 'loadingProgressBarTextColor', cssVariable: '--otk-loading-progress-bar-text-color', defaultValue: '#ffffff', inputType: 'color', idSuffix: 'loading-progress-text' },
+
+            // Clock Colours
+            { storageKey: 'clockBgColor', cssVariable: '--otk-clock-bg-color', defaultValue: '#181818', inputType: 'color', idSuffix: 'clock-bg' },
+            { storageKey: 'clockTextColor', cssVariable: '--otk-clock-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'clock-text' }
         ];
     }
 
@@ -7038,6 +7114,8 @@ async function main() {
     const styleElement = document.createElement('style');
     styleElement.textContent = `
         :root {
+            --otk-clock-bg-color: #181818;
+            --otk-clock-text-color: #e6e6e6;
             --otk-gui-bg-color: #181818;
             --otk-gui-bg-color: #181818;
             --otk-gui-text-color: #e6e6e6; /* General text in the main GUI bar */
