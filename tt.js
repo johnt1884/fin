@@ -369,22 +369,59 @@ function appendTextOrQuoteSegment(textElement, segment, quoteRegex, currentDepth
         }
 
         if (quotedMessageObject) {
-            const quotedElement = createMessageElementDOM(
-                quotedMessageObject,
-                                mediaLoadPromises, // Pass down the array for mediaLoadPromises for quotes
-                uniqueImageViewerHashes,
-                // uniqueVideoViewerHashes, // Removed
-                quotedMessageObject.board || boardForLink,
-                false, // isTopLevelMessage = false for quotes
-                currentDepth + 1,
-                null, // threadColor is not used for quoted message accents
-                parentMessageId // Pass the PARENT message's ID for the quote
-            );
-            if (quotedElement) {
-                if (currentDepth >= MAX_QUOTE_DEPTH - 1 && !quotedMessageObject.text) {
-                    return;
+            const filterRules = JSON.parse(localStorage.getItem('otkFilterRules') || '[]');
+            const parsedRules = filterRules.map(parseFilterRule);
+            if (isMessageFiltered(quotedMessageObject, parsedRules)) {
+                const collapsedView = document.createElement('div');
+                const header = document.createElement('span');
+                header.textContent = `>>${quotedMessageObject.id} `;
+
+                const blockIcon = document.createElement('span');
+                blockIcon.innerHTML = '&#128711;';
+                header.appendChild(blockIcon);
+
+                const plusIcon = document.createElement('span');
+                plusIcon.innerHTML = ' [+]';
+                plusIcon.style.cursor = 'pointer';
+                header.appendChild(plusIcon);
+
+                collapsedView.appendChild(header);
+
+                plusIcon.addEventListener('click', () => {
+                    const fullQuoteElement = createMessageElementDOM(
+                        quotedMessageObject,
+                        [],
+                        uniqueImageViewerHashes,
+                        quotedMessageObject.board || boardForLink,
+                        false,
+                        currentDepth + 1,
+                        null,
+                        parentMessageId
+                    );
+                    if (fullQuoteElement) {
+                        collapsedView.replaceWith(fullQuoteElement);
+                    }
+                });
+                textElement.appendChild(collapsedView);
+
+            } else {
+                const quotedElement = createMessageElementDOM(
+                    quotedMessageObject,
+                                    mediaLoadPromises, // Pass down the array for mediaLoadPromises for quotes
+                    uniqueImageViewerHashes,
+                    // uniqueVideoViewerHashes, // Removed
+                    quotedMessageObject.board || boardForLink,
+                    false, // isTopLevelMessage = false for quotes
+                    currentDepth + 1,
+                    null, // threadColor is not used for quoted message accents
+                    parentMessageId // Pass the PARENT message's ID for the quote
+                );
+                if (quotedElement) {
+                    if (currentDepth >= MAX_QUOTE_DEPTH - 1 && !quotedMessageObject.text) {
+                        return;
+                    }
+                    textElement.appendChild(quotedElement);
                 }
-                textElement.appendChild(quotedElement);
             }
         } else {
             const notFoundSpan = document.createElement('span');
@@ -1308,6 +1345,49 @@ function animateStatIncrease(statEl, plusNEl, from, to) {
     }
 
     // --- Core Logic: Rendering, Fetching, Updating ---
+
+    function parseFilterRule(ruleString) {
+        const textRegex = /"([^"]*)"/g;
+        const md5Regex = /md5:([a-zA-Z0-9+/=]+)/gi;
+        const parsed = { text: [], md5: [] };
+        let match;
+
+        while ((match = textRegex.exec(ruleString)) !== null) {
+            parsed.text.push(match[1].toLowerCase());
+        }
+        while ((match = md5Regex.exec(ruleString)) !== null) {
+            parsed.md5.push(match[1]);
+        }
+        return parsed;
+    }
+
+    function isMessageFiltered(message, parsedRules) {
+        const messageText = (message.text || '').toLowerCase();
+        const messageMd5 = message.attachment?.filehash_db_key || '';
+
+        for (const rule of parsedRules) {
+            const hasText = rule.text.length > 0;
+            const hasMd5 = rule.md5.length > 0;
+
+            if (!hasText && !hasMd5) continue;
+
+            let textMatch = !hasText;
+            if (hasText) {
+                textMatch = rule.text.every(t => messageText.includes(t));
+            }
+
+            let md5Match = !hasMd5;
+            if (hasMd5) {
+                md5Match = rule.md5.some(m => messageMd5 === m);
+            }
+
+            if (textMatch && md5Match) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function renderThreadList() {
         const threadDisplayContainer = document.getElementById('otk-thread-display-container');
         if (!threadDisplayContainer) {
@@ -1720,6 +1800,7 @@ function animateStatIncrease(statEl, plusNEl, from, to) {
         otkViewer.innerHTML = ''; // Clear previous content
 
         let allMessages = getAllMessagesSorted();
+
     const themeSettings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
     const messageLimitEnabled = themeSettings.otkMessageLimitEnabled !== false;
     const messageLimitValue = parseInt(themeSettings.otkMessageLimitValue || '500', 10);
@@ -2344,6 +2425,66 @@ function _populateAttachmentDivWithMedia(
 
     // Signature now includes parentMessageId and ancestors
     function createMessageElementDOM(message, mediaLoadPromises, uniqueImageViewerHashes, boardForLink, isTopLevelMessage, currentDepth, threadColor, parentMessageId = null, ancestors = new Set()) {
+        const filterRules = JSON.parse(localStorage.getItem('otkFilterRules') || '[]');
+        const parsedRules = filterRules.map(parseFilterRule);
+        const isFiltered = isMessageFiltered(message, parsedRules);
+
+        if (isTopLevelMessage && isFiltered) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'otk-message-container-main';
+            messageDiv.setAttribute('data-message-id', message.id);
+
+            const messageHeader = document.createElement('div');
+            // Simplified header for filtered messages
+            messageHeader.style.cssText = `padding: 5px; border-bottom: 1px solid #555; display: flex; align-items: center;`;
+
+            const headerText = document.createElement('span');
+            headerText.textContent = `Message ${message.id} is filtered. `;
+            messageHeader.appendChild(headerText);
+
+            const redBlockIcon = document.createElement('span');
+            redBlockIcon.innerHTML = '&#128711;';
+            redBlockIcon.style.color = 'red';
+            redBlockIcon.style.cursor = 'pointer';
+            redBlockIcon.style.marginLeft = '10px';
+            redBlockIcon.addEventListener('click', () => {
+                document.getElementById('otk-filter-btn').click();
+                renderFilterList();
+            });
+            messageHeader.appendChild(redBlockIcon);
+
+            const plusIcon = document.createElement('span');
+            plusIcon.innerHTML = '[+]';
+            plusIcon.style.cursor = 'pointer';
+            plusIcon.style.marginLeft = '5px';
+            messageHeader.appendChild(plusIcon);
+
+            messageDiv.appendChild(messageHeader);
+
+            const contentDiv = document.createElement('div');
+            contentDiv.style.padding = '10px';
+            messageDiv.appendChild(contentDiv);
+
+            // Render replies (quotes)
+            if (message.text) {
+                const lines = message.text.split('\n');
+                lines.forEach(line => {
+                    const quoteRegex = /^>>(\d+)/;
+                    if (line.match(quoteRegex)) {
+                        appendTextOrQuoteSegment(contentDiv, line, quoteRegex, 0, MAX_QUOTE_DEPTH, messagesByThreadId, uniqueImageViewerHashes, boardForLink, mediaLoadPromises, message.id);
+                    }
+                });
+            }
+
+            plusIcon.addEventListener('click', () => {
+                // Restore the filtered content
+                const fullContent = createMessageElementDOM(message, mediaLoadPromises, uniqueImageViewerHashes, boardForLink, false, 0, threadColor, parentMessageId, ancestors);
+                messageDiv.replaceWith(fullContent);
+            }, { once: true });
+
+            return messageDiv;
+        }
+
         const layoutStyle = localStorage.getItem('otkMessageLayoutStyle') || 'default';
         consoleLog(`[DepthCheck] Rendering message: ${message.id}, parent: ${parentMessageId}, currentDepth: ${currentDepth}, MAX_QUOTE_DEPTH: ${MAX_QUOTE_DEPTH}, isTopLevel: ${isTopLevelMessage}, layoutStyle: ${layoutStyle}`);
 
@@ -2590,6 +2731,37 @@ function _populateAttachmentDivWithMedia(
             headerContent.appendChild(document.createTextNode(prefix));
             headerContent.appendChild(idSpan);
             headerContent.appendChild(document.createTextNode(`\u00A0| ${timestampParts.time} | ${timestampParts.date}`));
+
+            const blockIcon = document.createElement('span');
+            blockIcon.innerHTML = '&#128711;'; // Block icon
+            blockIcon.style.cssText = 'margin-left: 10px; cursor: pointer; visibility: hidden;';
+            headerContent.appendChild(blockIcon);
+
+            messageHeader.addEventListener('mouseenter', () => {
+                blockIcon.style.visibility = 'visible';
+            });
+            messageHeader.addEventListener('mouseleave', () => {
+                blockIcon.style.visibility = 'hidden';
+            });
+
+            blockIcon.addEventListener('click', (e) => {
+                e.stopPropagation();
+                let rule = '';
+                if (message.text) {
+                    const cleanedText = message.text.replace(/>>\d+(\s\(You\))?/g, '').trim();
+                    if (cleanedText) {
+                        rule += `"${cleanedText}"`;
+                    }
+                }
+                if (message.attachment && message.attachment.filehash_db_key) {
+                    rule += ` md5:${message.attachment.filehash_db_key}`;
+                }
+                const filterWindow = document.getElementById('otk-filter-window');
+                if (filterWindow) {
+                    filterWindow.style.display = 'flex';
+                    renderNewFilterView(rule.trim());
+                }
+            });
 
             messageHeader.appendChild(headerContent);
             textWrapperDiv.appendChild(messageHeader);
@@ -3140,6 +3312,37 @@ function _populateAttachmentDivWithMedia(
                 leftHeaderContent.appendChild(idSpan);
                 leftHeaderContent.appendChild(timeText);
 
+                const blockIcon = document.createElement('span');
+                blockIcon.innerHTML = '&#128711;'; // Block icon
+                blockIcon.style.cssText = 'margin-left: 10px; cursor: pointer; visibility: hidden;';
+                leftHeaderContent.appendChild(blockIcon);
+
+                messageHeader.addEventListener('mouseenter', () => {
+                    blockIcon.style.visibility = 'visible';
+                });
+                messageHeader.addEventListener('mouseleave', () => {
+                    blockIcon.style.visibility = 'hidden';
+                });
+
+                blockIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    let rule = '';
+                    if (message.text) {
+                        const cleanedText = message.text.replace(/>>\d+(\s\(You\))?/g, '').trim();
+                        if (cleanedText) {
+                            rule += `"${cleanedText}"`;
+                        }
+                    }
+                    if (message.attachment && message.attachment.filehash_db_key) {
+                        rule += ` md5:${message.attachment.filehash_db_key}`;
+                    }
+                    const filterWindow = document.getElementById('otk-filter-window');
+                    if (filterWindow) {
+                        filterWindow.style.display = 'flex';
+                        renderNewFilterView(rule.trim());
+                    }
+                });
+
                 const dateSpan = document.createElement('span');
                 dateSpan.textContent = timestampParts.date;
 
@@ -3170,6 +3373,37 @@ function _populateAttachmentDivWithMedia(
                     }
                 });
                 messageHeader.appendChild(idSpan);
+
+                const blockIcon = document.createElement('span');
+                blockIcon.innerHTML = '&#128711;'; // Block icon
+                blockIcon.style.cssText = 'margin-left: 10px; cursor: pointer; visibility: hidden;';
+                messageHeader.appendChild(blockIcon);
+
+                messageHeader.addEventListener('mouseenter', () => {
+                    blockIcon.style.visibility = 'visible';
+                });
+                messageHeader.addEventListener('mouseleave', () => {
+                    blockIcon.style.visibility = 'hidden';
+                });
+
+                blockIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    let rule = '';
+                    if (message.text) {
+                        const cleanedText = message.text.replace(/>>\d+(\s\(You\))?/g, '').trim();
+                        if (cleanedText) {
+                            rule += `"${cleanedText}"`;
+                        }
+                    }
+                    if (message.attachment && message.attachment.filehash_db_key) {
+                        rule += ` md5:${message.attachment.filehash_db_key}`;
+                    }
+                    const filterWindow = document.getElementById('otk-filter-window');
+                    if (filterWindow) {
+                        filterWindow.style.display = 'flex';
+                        renderNewFilterView(rule.trim());
+                    }
+                });
             }
             messageDiv.appendChild(messageHeader);
 
@@ -4510,17 +4744,33 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
             consoleLog('[Clear] LocalStorage (threads, messages, seen embeds, media counts, ACTIVE theme) cleared/reset. CUSTOM THEMES PRESERVED.');
 
             if (otkMediaDB) {
-                consoleLog('[Clear] Clearing IndexedDB mediaStore...');
+                consoleLog('[Clear] Clearing IndexedDB mediaStore (preserving filtered media)...');
+                const filterRules = JSON.parse(localStorage.getItem('otkFilterRules') || '[]');
+                const parsedRules = filterRules.map(parseFilterRule);
+                const preservedHashes = new Set();
+                parsedRules.forEach(rule => {
+                    rule.md5.forEach(hash => preservedHashes.add(hash));
+                });
+                consoleLog(`[Clear] Preserving ${preservedHashes.size} media files from filter rules.`);
+
                 const mediaTransaction = otkMediaDB.transaction(['mediaStore'], 'readwrite');
                 const mediaStore = mediaTransaction.objectStore('mediaStore');
-                const mediaClearRequest = mediaStore.clear();
+                const cursorRequest = mediaStore.openCursor();
+
                 await new Promise((resolve, reject) => {
-                    mediaClearRequest.onsuccess = () => {
-                        consoleLog('[Clear] IndexedDB mediaStore cleared successfully.');
-                        resolve();
+                    cursorRequest.onsuccess = (event) => {
+                        const cursor = event.target.result;
+                        if (cursor) {
+                            if (!preservedHashes.has(cursor.value.filehash)) {
+                                cursor.delete();
+                            }
+                            cursor.continue();
+                        } else {
+                            resolve(); // Cursor finished
+                        }
                     };
-                    mediaClearRequest.onerror = (event) => {
-                        consoleError('[Clear] Error clearing IndexedDB mediaStore:', event.target.error);
+                    cursorRequest.onerror = (event) => {
+                        consoleError('[Clear] Error while clearing mediaStore with cursor:', event.target.error);
                         reject(event.target.error);
                     };
                 });
@@ -4870,18 +5120,6 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
         align-items: center; /* Center items vertically */
     `;
 
-    const clockTextSpan = document.createElement('span');
-    clockTextSpan.id = 'otk-clock-text';
-    clockElement.appendChild(clockTextSpan);
-
-    const searchIcon = document.createElement('span');
-    searchIcon.id = 'otk-clock-search-icon';
-    searchIcon.innerHTML = '&#128269;'; // Search icon emoji
-    searchIcon.style.cssText = `
-        margin-left: 8px;
-        cursor: pointer;
-    `;
-    clockElement.appendChild(searchIcon);
     document.body.appendChild(clockElement);
 
     // Timezone Search Container
@@ -5038,20 +5276,6 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
         }
     });
 
-    // Timezone Search Interaction
-    searchIcon.addEventListener('click', (e) => {
-        e.stopPropagation(); // Prevent the clock's drag from starting
-
-        if (timezoneSearchContainer.style.display === 'block') {
-            timezoneSearchContainer.style.display = 'none';
-        } else {
-            const clockRect = clockElement.getBoundingClientRect();
-            timezoneSearchContainer.style.top = `${clockRect.bottom + 5}px`;
-            timezoneSearchContainer.style.left = `${clockRect.left}px`;
-            timezoneSearchContainer.style.display = 'block';
-        }
-    });
-
     // Hide search if clicking outside
     document.addEventListener('click', (e) => {
         if (!clockElement.contains(e.target) && !timezoneSearchContainer.contains(e.target)) {
@@ -5122,6 +5346,14 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
         btnMemoryReport.style.display = localStorage.getItem('otkMemoryReportEnabled') === 'true' ? 'inline-block' : 'none';
         btnMemoryReport.addEventListener('click', generateMemoryUsageReport);
 
+        const btnFilter = createTrackerButton('Filter', 'otk-filter-btn');
+        btnFilter.addEventListener('click', () => {
+            const filterWindow = document.getElementById('otk-filter-window');
+            if (filterWindow) {
+                filterWindow.style.display = filterWindow.style.display === 'none' ? 'flex' : 'none';
+            }
+        });
+
 
         const thirdButtonColumn = document.createElement('div');
         thirdButtonColumn.style.cssText = `
@@ -5148,6 +5380,7 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
         bottomRowContainer.appendChild(btnToggleViewer);
         bottomRowContainer.appendChild(btnRefresh);
         bottomRowContainer.appendChild(btnClearRefresh);
+        bottomRowContainer.appendChild(btnFilter);
         bottomRowContainer.appendChild(btnMemoryReport);
 
         // Append row containers to the main buttonContainer
@@ -5249,27 +5482,126 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
         }
     }
 
-    function updateClock() {
-    const clockTextElement = document.getElementById('otk-clock-text');
-    if (clockTextElement) {
+    let activeClockSearchId = null;
+
+    function renderClocks() {
+        const clockContainer = document.getElementById('otk-clock');
+        if (!clockContainer) return;
+
+        clockContainer.innerHTML = ''; // Clear existing clocks
         const clocks = JSON.parse(localStorage.getItem('otkClocks') || '[]');
-        if (clocks.length === 0) return; // Should not happen after migration
-        const firstClock = clocks[0];
 
-        const savedTimezone = firstClock.timezone;
-        const savedPlace = firstClock.displayPlace;
-        const timeZoneName = savedPlace || savedTimezone.split('/').pop().replace(/_/g, ' ');
+        clocks.forEach((clock, index) => {
+            const clockInstance = document.createElement('div');
+            clockInstance.className = 'otk-clock-instance';
+            clockInstance.dataset.clockId = clock.id;
+            clockInstance.style.display = 'flex';
+            clockInstance.style.alignItems = 'center';
+            clockInstance.style.padding = '0 5px';
+            clockInstance.style.position = 'relative';
 
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('en-US', {
-            timeZone: savedTimezone,
-                hour12: false,
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
+            const clockTextSpan = document.createElement('span');
+            clockTextSpan.id = `otk-clock-text-${clock.id}`;
+            clockInstance.appendChild(clockTextSpan);
+
+            const iconsWrapper = document.createElement('span');
+            iconsWrapper.className = 'otk-clock-icons-wrapper';
+            iconsWrapper.style.marginLeft = '8px';
+            iconsWrapper.style.display = 'flex';
+            iconsWrapper.style.alignItems = 'center';
+
+
+            const searchIcon = document.createElement('span');
+            searchIcon.className = 'otk-clock-icon otk-clock-search-icon';
+            searchIcon.innerHTML = '&#128269;'; // Search icon
+            searchIcon.style.cssText = 'cursor: default; display: none;';
+            searchIcon.addEventListener('click', (e) => {
+                e.stopPropagation();
+                activeClockSearchId = clock.id;
+                const timezoneSearchContainer = document.getElementById('otk-timezone-search-container');
+                if (timezoneSearchContainer.style.display === 'block' && activeClockSearchId === clock.id) {
+                    timezoneSearchContainer.style.display = 'none';
+                } else {
+                    const clockRect = clockContainer.getBoundingClientRect();
+                    timezoneSearchContainer.style.top = `${clockRect.bottom + 5}px`;
+                    timezoneSearchContainer.style.left = `${clockRect.left}px`;
+                    timezoneSearchContainer.style.display = 'block';
+                }
             });
-        clockTextElement.textContent = `${timeString} ${timeZoneName}`;
-        }
+            iconsWrapper.appendChild(searchIcon);
+
+            const addIcon = document.createElement('span');
+            addIcon.className = 'otk-clock-icon otk-clock-add-icon';
+            addIcon.innerHTML = '&#10133;'; // Plus icon
+            addIcon.style.cssText = 'margin-left: 5px; cursor: default; display: none;';
+            addIcon.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const currentClocks = JSON.parse(localStorage.getItem('otkClocks') || '[]');
+                const newClock = {
+                    id: Date.now(),
+                    timezone: 'America/New_York',
+                    displayPlace: 'New York'
+                };
+                currentClocks.splice(index + 1, 0, newClock);
+                localStorage.setItem('otkClocks', JSON.stringify(currentClocks));
+                renderClocks();
+            });
+            iconsWrapper.appendChild(addIcon);
+
+            if (index > 0) {
+                const removeIcon = document.createElement('span');
+                removeIcon.className = 'otk-clock-icon otk-clock-remove-icon';
+                removeIcon.innerHTML = '&#10060;'; // Cross icon
+                removeIcon.style.cssText = 'margin-left: 5px; cursor: default; display: none;';
+                removeIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    let currentClocks = JSON.parse(localStorage.getItem('otkClocks') || '[]');
+                    currentClocks = currentClocks.filter(c => c.id !== clock.id);
+                    localStorage.setItem('otkClocks', JSON.stringify(currentClocks));
+                    renderClocks();
+                });
+                iconsWrapper.appendChild(removeIcon);
+            }
+
+            clockInstance.appendChild(iconsWrapper);
+
+            clockInstance.addEventListener('mouseenter', () => {
+                clockInstance.querySelectorAll('.otk-clock-icon').forEach(icon => icon.style.display = 'inline-block');
+            });
+            clockInstance.addEventListener('mouseleave', () => {
+                clockInstance.querySelectorAll('.otk-clock-icon').forEach(icon => icon.style.display = 'none');
+            });
+
+            clockContainer.appendChild(clockInstance);
+
+            if (index < clocks.length - 1) {
+                const divider = document.createElement('span');
+                divider.textContent = '|';
+                divider.style.color = 'var(--otk-clock-divider-color, #ff8040)';
+                divider.style.padding = '0 5px';
+                clockContainer.appendChild(divider);
+            }
+        });
+        updateClockTimes();
+    }
+
+    function updateClockTimes() {
+        const clocks = JSON.parse(localStorage.getItem('otkClocks') || '[]');
+        clocks.forEach(clock => {
+            const clockTextElement = document.getElementById(`otk-clock-text-${clock.id}`);
+            if (clockTextElement) {
+                const timeZoneName = clock.displayPlace || clock.timezone.split('/').pop().replace(/_/g, ' ');
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('en-US', {
+                    timeZone: clock.timezone,
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                clockTextElement.textContent = `${timeString} ${timeZoneName}`;
+            }
+        });
     }
 
 function startAutoEmbedReloader() {
@@ -6593,6 +6925,7 @@ function applyThemeSettings(options = {}) {
         themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Background:", storageKey: 'clockBgColor', cssVariable: '--otk-clock-bg-color', defaultValue: '', inputType: 'color', idSuffix: 'clock-bg' }));
         themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Text:", storageKey: 'clockTextColor', cssVariable: '--otk-clock-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'clock-text' }));
         themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Border:", storageKey: 'clockBorderColor', cssVariable: '--otk-clock-border-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'clock-border' }));
+        themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Divider:", storageKey: 'clockDividerColor', cssVariable: '--otk-clock-divider-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'clock-divider' }));
         themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Search Background:", storageKey: 'clockSearchBgColor', cssVariable: '--otk-clock-search-bg-color', defaultValue: '#333', inputType: 'color', idSuffix: 'clock-search-bg' }));
         themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Search Text:", storageKey: 'clockSearchTextColor', cssVariable: '--otk-clock-search-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'clock-search-text' }));
 
@@ -7495,6 +7828,278 @@ function applyThemeSettings(options = {}) {
         consoleLog("Options Window setup complete with drag functionality.");
     }
 
+    function renderNewFilterView(prefilledRule = '') {
+        const rightContent = document.getElementById('otk-filter-content');
+        if (!rightContent) return;
+
+        rightContent.innerHTML = ''; // Clear content area
+
+        const ruleInput = document.createElement('textarea');
+        ruleInput.id = 'otk-filter-rule-input';
+        ruleInput.style.cssText = 'width: 100%; height: 100px; margin-bottom: 10px;';
+        ruleInput.value = prefilledRule;
+        rightContent.appendChild(ruleInput);
+
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'display: flex; justify-content: flex-end; gap: 10px;';
+        rightContent.appendChild(buttonContainer);
+
+        const createBtn = createTrackerButton('Create Filter');
+        const createAndCloseBtn = createTrackerButton('Create and Close');
+
+        function handleCreateRule(andClose) {
+            const ruleInput = document.getElementById('otk-filter-rule-input');
+            if (!ruleInput) return;
+            const rule = ruleInput.value.trim();
+            if (rule) {
+                let rules = JSON.parse(localStorage.getItem('otkFilterRules') || '[]');
+                if (!rules.includes(rule)) {
+                    rules.push(rule);
+                    localStorage.setItem('otkFilterRules', JSON.stringify(rules));
+                    ruleInput.value = ''; // Clear input after successful creation
+                    if (andClose) {
+                        document.getElementById('otk-filter-window').style.display = 'none';
+                    } else {
+                        document.getElementById('otk-filter-content').innerHTML = 'Filter created!';
+                    }
+                } else {
+                    alert('This filter rule already exists.');
+                }
+            }
+        }
+
+        createBtn.addEventListener('click', () => handleCreateRule(false));
+        createAndCloseBtn.addEventListener('click', () => handleCreateRule(true));
+
+        buttonContainer.appendChild(createBtn);
+        buttonContainer.appendChild(createAndCloseBtn);
+
+        const cancelBtn = createTrackerButton('Cancel');
+        cancelBtn.addEventListener('click', () => {
+            rightContent.innerHTML = '';
+        });
+        buttonContainer.appendChild(cancelBtn);
+    }
+
+    function setupFilterWindow() {
+        consoleLog("Setting up Filter Window...");
+
+        if (document.getElementById('otk-filter-window')) {
+            consoleLog("Filter window already exists.");
+            return;
+        }
+
+        const filterWindow = document.createElement('div');
+        filterWindow.id = 'otk-filter-window';
+        filterWindow.style.cssText = `
+            position: fixed;
+            top: 120px;
+            left: 120px;
+            width: 600px;
+            height: 400px;
+            background-color: #2c2c2c;
+            border: 1px solid #444;
+            border-radius: 5px;
+            z-index: 10001;
+            display: none;
+            flex-direction: column;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            color: var(--otk-options-text-color);
+        `;
+
+        const titleBar = document.createElement('div');
+        titleBar.style.cssText = `
+            padding: 8px 12px;
+            background-color: #383838;
+            color: #f0f0f0;
+            font-weight: bold;
+            cursor: move;
+            border-bottom: 1px solid #444;
+            border-top-left-radius: 5px;
+            border-top-right-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        `;
+        titleBar.textContent = 'Filter Settings';
+
+        const closeButton = document.createElement('span');
+        closeButton.innerHTML = '&#x2715;';
+        closeButton.style.cssText = 'cursor: pointer; font-size: 16px;';
+        closeButton.addEventListener('click', () => {
+            filterWindow.style.display = 'none';
+        });
+
+        titleBar.appendChild(closeButton);
+        filterWindow.appendChild(titleBar);
+
+        let isDragging = false;
+        let offsetX, offsetY;
+
+        titleBar.addEventListener('mousedown', (e) => {
+            if (e.target === closeButton) return;
+            isDragging = true;
+            offsetX = e.clientX - filterWindow.offsetLeft;
+            offsetY = e.clientY - filterWindow.offsetTop;
+            titleBar.style.userSelect = 'none';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                filterWindow.style.left = `${e.clientX - offsetX}px`;
+                filterWindow.style.top = `${e.clientY - offsetY}px`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            titleBar.style.userSelect = '';
+            document.body.style.userSelect = '';
+        });
+
+        const mainContent = document.createElement('div');
+        mainContent.style.cssText = 'display: flex; flex-grow: 1;';
+        filterWindow.appendChild(mainContent);
+
+        const leftMenu = document.createElement('div');
+        leftMenu.id = 'otk-filter-menu';
+        leftMenu.style.cssText = `
+            width: 120px;
+            padding: 10px;
+            border-right: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        `;
+        mainContent.appendChild(leftMenu);
+
+        const rightContent = document.createElement('div');
+        rightContent.id = 'otk-filter-content';
+        rightContent.style.cssText = 'padding: 10px; flex-grow: 1; display: flex; flex-direction: column;';
+        mainContent.appendChild(rightContent);
+
+        function renderFilterList() {
+            const rightContent = document.getElementById('otk-filter-content');
+            if (!rightContent) return;
+            rightContent.innerHTML = '';
+
+            const header = document.createElement('div');
+            header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;';
+
+            const checkAllContainer = document.createElement('div');
+            const checkAllLabel = document.createElement('label');
+            checkAllLabel.textContent = 'Select All';
+            checkAllLabel.style.marginRight = '5px';
+            const checkAllBox = document.createElement('input');
+            checkAllBox.type = 'checkbox';
+            checkAllContainer.appendChild(checkAllLabel);
+            checkAllContainer.appendChild(checkAllBox);
+            header.appendChild(checkAllContainer);
+
+            const deleteSelectedBtn = createTrackerButton('Delete Selected');
+            deleteSelectedBtn.id = 'otk-delete-selected-filters-btn';
+            deleteSelectedBtn.style.display = 'none';
+            header.appendChild(deleteSelectedBtn);
+
+            rightContent.appendChild(header);
+
+            const ruleListContainer = document.createElement('div');
+            ruleListContainer.style.cssText = 'display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; padding-right: 15px;';
+            rightContent.appendChild(ruleListContainer);
+
+            const rules = JSON.parse(localStorage.getItem('otkFilterRules') || '[]');
+            if (rules.length === 0) {
+                ruleListContainer.textContent = 'No filter rules saved.';
+                return;
+            }
+
+            rules.forEach((rule, index) => {
+                const ruleDiv = document.createElement('div');
+                ruleDiv.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid #444;';
+
+                const contentWrapper = document.createElement('div');
+                contentWrapper.style.display = 'flex';
+                contentWrapper.style.alignItems = 'center';
+
+                const parsed = parseFilterRule(rule);
+                let textContent = rule;
+                if (parsed.md5.length > 0 && parsed.text.length > 0) {
+                    textContent = parsed.text.join(' ');
+                } else if (parsed.md5.length > 0) {
+                    textContent = '';
+                }
+
+                const ruleText = document.createElement('span');
+                ruleText.textContent = textContent;
+                contentWrapper.appendChild(ruleText);
+
+                if (parsed.md5.length > 0 && otkMediaDB) {
+                    parsed.md5.forEach(hash => {
+                        const transaction = otkMediaDB.transaction(['mediaStore'], 'readonly');
+                        const store = transaction.objectStore('mediaStore');
+                        const request = store.get(hash);
+                        request.onsuccess = (event) => {
+                            const item = event.target.result;
+                            if (item && item.blob) {
+                                const mediaElement = item.ext.toLowerCase().includes('webm') ? document.createElement('video') : document.createElement('img');
+                                mediaElement.src = URL.createObjectURL(item.blob);
+                                if (item.ext.toLowerCase().includes('webm')) mediaElement.controls = true;
+                                mediaElement.style.maxWidth = '100px';
+                                mediaElement.style.maxHeight = '100px';
+                                mediaElement.style.marginLeft = '10px';
+                                contentWrapper.appendChild(mediaElement);
+                            }
+                        };
+                    });
+                }
+
+                ruleDiv.appendChild(contentWrapper);
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.dataset.ruleIndex = index;
+                checkbox.style.marginLeft = '10px';
+                ruleDiv.appendChild(checkbox);
+                ruleListContainer.appendChild(ruleDiv);
+            });
+
+            const checkboxes = Array.from(ruleListContainer.querySelectorAll('input[type="checkbox"]'));
+            const toggleDeleteButton = () => {
+                const anyChecked = checkboxes.some(cb => cb.checked);
+                deleteSelectedBtn.style.display = anyChecked ? 'inline-block' : 'none';
+            };
+
+            checkboxes.forEach(cb => cb.addEventListener('change', toggleDeleteButton));
+            checkAllBox.addEventListener('change', () => {
+                checkboxes.forEach(cb => cb.checked = checkAllBox.checked);
+                toggleDeleteButton();
+            });
+
+            deleteSelectedBtn.addEventListener('click', () => {
+                let currentRules = JSON.parse(localStorage.getItem('otkFilterRules') || '[]');
+                const indicesToDelete = checkboxes
+                    .filter(cb => cb.checked)
+                    .map(cb => parseInt(cb.dataset.ruleIndex, 10));
+
+                const newRules = currentRules.filter((_, index) => !indicesToDelete.includes(index));
+                localStorage.setItem('otkFilterRules', JSON.stringify(newRules));
+                renderFilterList();
+            });
+        }
+
+        const filterListBtn = createTrackerButton('Filter List');
+        filterListBtn.addEventListener('click', renderFilterList);
+        leftMenu.appendChild(filterListBtn);
+
+        const newFilterBtn = createTrackerButton('New Filter');
+        newFilterBtn.addEventListener('click', () => renderNewFilterView());
+        leftMenu.appendChild(newFilterBtn);
+
+        document.body.appendChild(filterWindow);
+        consoleLog("Filter Window setup complete.");
+    }
+
     // --- Initial Actions / Main Execution ---
     async function main() {
         // Clock data migration
@@ -7783,6 +8388,7 @@ function applyThemeSettings(options = {}) {
 
         await applyMainTheme();
         setupOptionsWindow(); // Call to create the options window shell and event listeners
+        setupFilterWindow();
         applyThemeSettings(); // Apply any saved theme settings
         await fetchTimezones();
         setupTimezoneSearch();
@@ -7896,11 +8502,12 @@ function applyThemeSettings(options = {}) {
         if (localStorage.getItem('otkClockEnabled') === 'true') {
             const clockElement = document.getElementById('otk-clock');
             if (clockElement) {
-                clockElement.style.display = 'block';
+                clockElement.style.display = 'flex';
+                renderClocks();
             }
         }
 
-        setInterval(updateClock, 1000);
+        setInterval(updateClockTimes, 1000);
 
         function handleActivity() {
             if (scrollTimeout) {
@@ -8061,20 +8668,20 @@ function applyThemeSettings(options = {}) {
             });
             resultDiv.addEventListener('click', () => {
                 const selectedTimezone = resultDiv.dataset.timezone;
-                const clocks = JSON.parse(localStorage.getItem('otkClocks') || '[]');
+                let clocks = JSON.parse(localStorage.getItem('otkClocks') || '[]');
+                const clockIndex = clocks.findIndex(c => c.id === activeClockSearchId);
 
-                // For now, this search function will only update the FIRST clock.
-                // In a later step, we will decide which clock is being edited.
-                if (clocks.length > 0) {
-                    clocks[0].timezone = selectedTimezone;
-                    clocks[0].displayPlace = city.city;
+                if (clockIndex !== -1) {
+                    clocks[clockIndex].timezone = selectedTimezone;
+                    clocks[clockIndex].displayPlace = city.city;
                     localStorage.setItem('otkClocks', JSON.stringify(clocks));
                 }
 
-                updateClock(); // Update immediately
+                renderClocks(); // Re-render to show changes
                 document.getElementById('otk-timezone-search-container').style.display = 'none'; // Hide search
                 searchInput.value = '';
                 searchResultsDiv.innerHTML = '';
+                activeClockSearchId = null; // Reset active clock
             });
             searchResultsDiv.appendChild(resultDiv);
         }
