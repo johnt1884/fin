@@ -5252,8 +5252,12 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
     function updateClock() {
     const clockTextElement = document.getElementById('otk-clock-text');
     if (clockTextElement) {
-        const savedTimezone = localStorage.getItem('otkClockTimezone') || 'America/Chicago';
-        const savedPlace = localStorage.getItem('otkClockDisplayPlace');
+        const clocks = JSON.parse(localStorage.getItem('otkClocks') || '[]');
+        if (clocks.length === 0) return; // Should not happen after migration
+        const firstClock = clocks[0];
+
+        const savedTimezone = firstClock.timezone;
+        const savedPlace = firstClock.displayPlace;
         const timeZoneName = savedPlace || savedTimezone.split('/').pop().replace(/_/g, ' ');
 
             const now = new Date();
@@ -7493,6 +7497,29 @@ function applyThemeSettings(options = {}) {
 
     // --- Initial Actions / Main Execution ---
     async function main() {
+        // Clock data migration
+        if (!localStorage.getItem('otkClocks')) {
+            const oldTimezone = localStorage.getItem('otkClockTimezone');
+            const oldDisplayPlace = localStorage.getItem('otkClockDisplayPlace');
+            let initialClocks = [];
+            if (oldTimezone) {
+                initialClocks.push({
+                    id: Date.now(),
+                    timezone: oldTimezone,
+                    displayPlace: oldDisplayPlace || oldTimezone.split('/').pop().replace(/_/g, ' ')
+                });
+            } else {
+                // Default clock if no old settings exist
+                initialClocks.push({
+                    id: Date.now(),
+                    timezone: 'America/Chicago',
+                    displayPlace: 'Chicago'
+                });
+            }
+            localStorage.setItem('otkClocks', JSON.stringify(initialClocks));
+            consoleLog('Clock settings migrated to new multi-clock format.');
+        }
+
         consoleLog("Starting OTK Thread Tracker script (v2.8)...");
 
         try {
@@ -8034,8 +8061,16 @@ function applyThemeSettings(options = {}) {
             });
             resultDiv.addEventListener('click', () => {
                 const selectedTimezone = resultDiv.dataset.timezone;
-                localStorage.setItem('otkClockTimezone', selectedTimezone);
-                localStorage.setItem('otkClockDisplayPlace', city.city);
+                const clocks = JSON.parse(localStorage.getItem('otkClocks') || '[]');
+
+                // For now, this search function will only update the FIRST clock.
+                // In a later step, we will decide which clock is being edited.
+                if (clocks.length > 0) {
+                    clocks[0].timezone = selectedTimezone;
+                    clocks[0].displayPlace = city.city;
+                    localStorage.setItem('otkClocks', JSON.stringify(clocks));
+                }
+
                 updateClock(); // Update immediately
                 document.getElementById('otk-timezone-search-container').style.display = 'none'; // Hide search
                 searchInput.value = '';
