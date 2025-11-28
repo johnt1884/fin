@@ -365,75 +365,116 @@ let unreadIds = new Set(JSON.parse(localStorage.getItem(UNREAD_MESSAGE_IDS_KEY) 
 
 
     // --- Media Embedding Helper Functions ---
-function createYouTubeEmbedElement(videoId, timestampStr) { // Removed isInlineEmbed parameter
+function createYouTubeEmbedElement(videoId, timestampStr) {
     let startSeconds = 0;
     if (timestampStr) {
-        // Try to parse timestamp like 1h2m3s or 2m3s or 3s or just 123 (YouTube takes raw seconds for ?t=)
-        // More robust parsing might be needed if youtube itself uses 1m30s format in its ?t= parameter.
-        // For now, assume ?t= is always seconds from the regex, or simple h/m/s format.
-        // Regex for youtubeMatch already captures 't' as a string of digits or h/m/s.
-        // Let's refine the parsing for h/m/s format.
-        if (timestampStr.match(/^\d+$/)) { // Pure seconds e.g. t=123
-             startSeconds = parseInt(timestampStr, 10) || 0;
-        } else { // Attempt to parse 1h2m3s format
+        if (timestampStr.match(/^\d+$/)) {
+            startSeconds = parseInt(timestampStr, 10) || 0;
+        } else {
             const timeParts = timestampStr.match(/(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?/);
             if (timeParts) {
                 const hours = parseInt(timeParts[1], 10) || 0;
                 const minutes = parseInt(timeParts[2], 10) || 0;
-                const seconds = parseInt(timeParts[3], 10) || 0; // Also handles case like "123" if 's' is optional and no h/m
-                if (hours > 0 || minutes > 0 || seconds > 0) { // ensure some part was parsed
-                     startSeconds = (hours * 3600) + (minutes * 60) + seconds;
-                } else if (timeParts[0] === timestampStr && !isNaN(parseInt(timestampStr,10)) ) { // fallback for plain numbers if regex above was too greedy with optional s
+                const seconds = parseInt(timeParts[3], 10) || 0;
+                if (hours > 0 || minutes > 0 || seconds > 0) {
+                    startSeconds = (hours * 3600) + (minutes * 60) + seconds;
+                } else if (timeParts[0] === timestampStr && !isNaN(parseInt(timestampStr, 10))) {
                     startSeconds = parseInt(timestampStr, 10) || 0;
                 }
             }
         }
     }
 
-    const embedUrl = `https://www.youtube.com/embed/${videoId}` + (startSeconds > 0 ? `?start=${startSeconds}&autoplay=0` : '?autoplay=0'); // Added autoplay=0
-
-    // Create a wrapper for responsive iframe
     const wrapper = document.createElement('div');
-    wrapper.className = 'otk-youtube-embed-wrapper'; // Base class
-    // Add 'otk-embed-inline' if specific styling beyond size is still desired from CSS,
-    // or remove if all styling is now direct. For now, let's assume it might still be useful for other tweaks.
-    wrapper.classList.add('otk-embed-inline');
-
-    wrapper.style.position = 'relative'; // Needed for the absolutely positioned iframe
-    wrapper.style.overflow = 'hidden';   // Good practice for wrappers
-    wrapper.style.margin = '10px 0';     // Consistent vertical margin
-    wrapper.style.backgroundColor = '#000'; // Black background while loading
-
-    // Universal fixed size for all YouTube embeds
+    wrapper.className = 'otk-youtube-embed-wrapper otk-embed-inline';
+    wrapper.style.position = 'relative';
+    wrapper.style.overflow = 'hidden';
+    wrapper.style.margin = '10px 0';
+    wrapper.style.backgroundColor = '#000';
     wrapper.style.width = '480px';
-    wrapper.style.height = '270px'; // 16:9 aspect ratio for 480px width
-    // No paddingBottom or conditional sizing logic needed anymore
+    wrapper.style.height = '270px';
 
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.top = '0';
-    iframe.style.left = '0';
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.setAttribute('frameborder', '0');
-    iframe.setAttribute('allowfullscreen', 'true');
-    iframe.setAttribute('allow', 'accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
+    const createIframe = (embedUrl) => {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.top = '0';
+        iframe.style.left = '0';
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.setAttribute('frameborder', '0');
+        iframe.setAttribute('allowfullscreen', 'true');
+        iframe.setAttribute('allow', 'accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
 
-    const lazyLoadEnabled = (localStorage.getItem('otkLazyLoadYouTube') || 'true') === 'true';
-
-    if (lazyLoadEnabled) {
-        iframe.dataset.src = embedUrl;
-        if (mediaIntersectionObserver) {
-            mediaIntersectionObserver.observe(wrapper);
+        const lazyLoadEnabled = (localStorage.getItem('otkLazyLoadYouTube') || 'true') === 'true';
+        if (lazyLoadEnabled) {
+            iframe.dataset.src = embedUrl;
+            wrapper.innerHTML = '';
+            wrapper.appendChild(iframe);
+            if (mediaIntersectionObserver) {
+                mediaIntersectionObserver.observe(wrapper);
+            } else {
+                consoleWarn("[LazyLoad] mediaIntersectionObserver not ready. Iframe will load immediately:", iframe.dataset.src);
+                iframe.src = embedUrl;
+            }
         } else {
-            consoleWarn("[LazyLoad] mediaIntersectionObserver not ready. Iframe will load immediately:", iframe.dataset.src);
-            iframe.src = iframe.dataset.src;
+            iframe.src = embedUrl;
+            wrapper.innerHTML = '';
+            wrapper.appendChild(iframe);
         }
-    } else {
-        iframe.src = embedUrl;
-    }
+    };
 
-    wrapper.appendChild(iframe);
+    const useFallback = (reason) => {
+        consoleLog(`[YT Fallback] Using fallback for video ${videoId}. Reason: ${reason}`);
+        const fallbackFormat = (JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {}).youtubeFallbackProviderFormat || 'https://invidious.tiekoetter.com/embed/{videoId}';
+        let embedUrl = fallbackFormat.replace('{videoId}', videoId);
+        if (startSeconds > 0) {
+            embedUrl += (embedUrl.includes('?') ? '&' : '?') + `start=${startSeconds}`;
+        }
+        createIframe(embedUrl);
+    };
+
+    GM_xmlhttpRequest({
+        method: 'GET',
+        url: `https://www.youtube.com/oembed?url=http://www.youtube.com/watch?v=${videoId}&format=json`,
+        onload: function(response) {
+            if (response.status === 200) {
+                try {
+                    const data = JSON.parse(response.responseText);
+                    if (data.title === "This video is unavailable.") {
+                        useFallback("oEmbed title indicates unavailable video.");
+                        return;
+                    }
+                } catch (e) {
+                    consoleWarn('[YT Fallback] Error parsing oEmbed response, assuming playable.', e);
+                }
+                let embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=0`;
+                if (startSeconds > 0) {
+                    embedUrl += `&start=${startSeconds}`;
+                }
+                createIframe(embedUrl);
+            } else {
+                useFallback(`oEmbed check failed with status ${response.status}`);
+            }
+        },
+        onerror: function(error) {
+            useFallback("oEmbed request failed.");
+        }
+    });
+
+    const placeholder = document.createElement('div');
+    placeholder.textContent = 'Loading YouTube embed...';
+    placeholder.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        background-color: #181818;
+        color: white;
+        font-size: 14px;
+    `;
+    wrapper.appendChild(placeholder);
+
     return wrapper;
 }
 
@@ -3159,13 +3200,20 @@ function _populateAttachmentDivWithMedia(
                 }
             };
 
-            video.onerror = () => loadFromCache(false);
+            video.onerror = () => {
+                const filehash = message.attachment.filehash_db_key;
+                if (video.src.startsWith('blob:') && filehash && videoBlobUrlCache.has(filehash)) {
+                    consoleWarn(`[MediaLoad] Cached video blob failed to load for ${filehash}. Clearing from cache and retrying.`);
+                    videoBlobUrlCache.delete(filehash);
+                    // Prevent infinite loops: remove the onerror handler before retrying.
+                    video.onerror = null;
+                    loadFromCache(true); // Retry once from DB/network
+                }
+            };
 
-            if (mediaLoadMode === 'cache_only') {
-                loadFromCache(true);
-            } else {
-                video.src = sourceUrl;
-            }
+            // Always try to load from cache first, and fallback to source.
+            // This prevents "Too Many Requests" errors by not re-fetching media that is already cached.
+            loadFromCache(true);
 
             if (message.attachment.filehash_db_key && isTopLevelMessage) {
                 viewerTopLevelAttachedVideoHashes.add(message.attachment.filehash_db_key);
@@ -8418,6 +8466,14 @@ function createSectionHeading(text) {
 
         // --- Viewer Section ---
         const viewerSectionContent = createCollapsibleSubSection('Viewer');
+        viewerSectionContent.appendChild(createThemeOptionRow({
+            labelText: 'Provider and Format for YouTube Fallback:',
+            storageKey: 'youtubeFallbackProviderFormat',
+            cssVariable: '--otk-youtube-fallback-provider-format',
+            defaultValue: 'https://invidious.tiekoetter.com/embed/{videoId}',
+            inputType: 'text',
+            idSuffix: 'youtube-fallback-provider'
+        }));
         viewerSectionContent.appendChild(createThemeOptionRow({ labelText: "Viewer Background Colour:", storageKey: 'viewerBgColor', cssVariable: '--otk-viewer-bg-color', defaultValue: '#181818', inputType: 'color', idSuffix: 'viewer-bg' }));
         viewerSectionContent.appendChild(createImagePickerRow({
             labelText: 'Viewer Background Image:',
