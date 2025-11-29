@@ -138,6 +138,7 @@ document.addEventListener("visibilitychange", () => {
 
     // --- Global variables ---
     let threadTitleAnimationInterval = null;
+    let titleFlashingInterval = null;
     let threadTitleAnimationIndex = 0;
     let originalTitle = document.title;
     let otkViewer = null;
@@ -934,6 +935,54 @@ function createTweetEmbedElement(tweetId) {
             z-index: 2;
         `;
         otkGuiWrapper.appendChild(borderDiv);
+
+        // Add Viewer Navigation Arrows
+        const upArrow = document.createElement('div');
+        upArrow.id = 'otk-viewer-up-arrow';
+        upArrow.innerHTML = '&#9650;'; // Up arrow character
+        upArrow.style.cssText = `
+            position: absolute;
+            top: 95px; /* Below the GUI border */
+            right: 15px;
+            cursor: pointer;
+            font-size: 20px;
+            color: var(--otk-viewer-arrow-color, #ff8040);
+            border: 1px solid var(--otk-viewer-arrow-border-color, #ff8040);
+            border-radius: 3px;
+            padding: 0px 5px;
+            z-index: 10000;
+        `;
+        upArrow.addEventListener('click', () => {
+            const messagesContainer = document.getElementById('otk-messages-container');
+            if (messagesContainer) {
+                messagesContainer.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+        otkGuiWrapper.appendChild(upArrow);
+
+        const downArrow = document.createElement('div');
+        downArrow.id = 'otk-viewer-down-arrow';
+        downArrow.innerHTML = '&#9660;'; // Down arrow character
+        downArrow.style.cssText = `
+            position: absolute;
+            top: 130px; /* Below the up arrow */
+            right: 15px;
+            cursor: pointer;
+            font-size: 20px;
+            color: var(--otk-viewer-arrow-color, #ff8040);
+            border: 1px solid var(--otk-viewer-arrow-border-color, #ff8040);
+            border-radius: 3px;
+            padding: 0px 5px;
+            z-index: 10000;
+        `;
+        downArrow.addEventListener('click', () => {
+            const messagesContainer = document.getElementById('otk-messages-container');
+            if (messagesContainer) {
+                messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+            }
+        });
+        otkGuiWrapper.appendChild(downArrow);
+
         document.body.style.paddingTop = '89px';
         document.body.style.margin = '0';
         document.body.insertBefore(otkGuiWrapper, document.body.firstChild);
@@ -1071,6 +1120,17 @@ function createTweetEmbedElement(tweetId) {
         otkStatsDisplay.appendChild(totalMessagesStat);
         otkStatsDisplay.appendChild(localImagesStat);
         otkStatsDisplay.appendChild(localVideosStat);
+
+        const repliesStat = document.createElement('div');
+        repliesStat.id = 'otk-replies-stat';
+        repliesStat.style.cssText = `
+            display: flex;
+            align-items: center;
+            color: var(--otk-replies-stat-color, var(--otk-stats-text-color));
+            min-width: 200px;
+            white-space: nowrap;
+        `;
+        otkStatsDisplay.appendChild(repliesStat);
 
         statsWrapper.appendChild(titleContainer);
         statsWrapper.appendChild(otkStatsDisplay);
@@ -3823,8 +3883,10 @@ function createMessageElementDOM(message, mediaLoadPromises, uniqueImageViewerHa
     const headerTextColorVar = `var(--otk-msg-depth-${parity.toLowerCase()}-header-text-color)`;
     const headerBorderVar = `var(--otk-viewer-header-border-color-${parity.toLowerCase()})`;
 
+    let borderColorVar = 'transparent';
     if (userPostIds.has(message.id)) {
         backgroundColorVar = isEvenDepth ? 'var(--otk-own-msg-bg-color-even)' : 'var(--otk-own-msg-bg-color-odd)';
+        borderColorVar = isEvenDepth ? 'var(--otk-own-msg-border-color-even)' : 'var(--otk-own-msg-border-color-odd)';
     }
 
     const shouldDisableUnderline = !isTopLevelMessage;
@@ -3918,6 +3980,9 @@ function createMessageElementDOM(message, mediaLoadPromises, uniqueImageViewerHa
         max-width: calc(100% - ${marginLeft});
         overflow-x: hidden;
     `;
+    if (borderColorVar !== 'transparent') {
+        messageDiv.style.border = `1px solid ${borderColorVar}`;
+    }
 
             // Removed the side rectangle logic that was here:
             // if (isTopLevelMessage && threadColor) { ... }
@@ -5388,6 +5453,43 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
         updateStatLine(totalMessagesElem, `- ${padNumber(mainMessagesCount, paddingLength)} Total Message${mainMessagesCount === 1 ? '' : 's'}`, newMessages, oldNewMessages, 'messages');
         updateStatLine(localImagesElem, `- ${padNumber(mainImagesCount, paddingLength)} Image${mainImagesCount === 1 ? '' : 's'}`, 0, 0, 'images');
         updateStatLine(localVideosElem, `- ${padNumber(mainVideosCount, paddingLength)} Video${mainVideosCount === 1 ? '' : 's'}`, 0, 0, 'videos');
+
+        const repliesStatElem = document.getElementById('otk-replies-stat');
+        // Replies stat update
+        const repliesCount = Array.from(unreadIds).filter(id => {
+            const msg = findMessageById(id);
+            return msg && msg.text && msg.text.includes('(You)');
+        }).length;
+
+        if (repliesStatElem) {
+            if (repliesCount > 0) {
+                repliesStatElem.textContent = `(+${repliesCount})`;
+            } else {
+                repliesStatElem.textContent = '';
+            }
+        }
+
+
+        // Flashing animation logic
+        const repliesStatAnimation = (JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {}).repliesStatAnimation || 'Flash';
+        const repliesStatAnimationSpeed = (JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {}).repliesStatAnimationSpeed || '1';
+
+        if (repliesStatElem && repliesCount > 0 && repliesStatAnimation === 'Flash') {
+            repliesStatElem.style.animation = `otk-flash ${repliesStatAnimationSpeed}s infinite`;
+            if (!titleFlashingInterval) {
+                const flashSpeed = parseFloat(repliesStatAnimationSpeed) * 1000;
+                titleFlashingInterval = setInterval(() => {
+                    document.title = document.title.startsWith('[!]') ? originalTitle : `[!] ${originalTitle}`;
+                }, flashSpeed);
+            }
+        } else if (repliesStatElem) {
+            repliesStatElem.style.animation = 'none';
+            if (titleFlashingInterval) {
+                clearInterval(titleFlashingInterval);
+                titleFlashingInterval = null;
+                document.title = originalTitle;
+            }
+        }
     }
 
     function setupTitleObserver() {
@@ -8691,6 +8793,35 @@ function createSectionHeading(text) {
         const evenMessagesSection = createCollapsibleSubSection('Messages (Evens)');
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Header Font Colour:", storageKey: 'msgDepthEvenHeaderTextColor', cssVariable: '--otk-msg-depth-even-header-text-color', defaultValue: '#555555', inputType: 'color', idSuffix: 'msg-depth-even-header-text', requiresRerender: true }));
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Media Controls BG (Even):", storageKey: 'mediaControlsBgColorEven', cssVariable: '--otk-media-controls-bg-color-even', defaultValue: 'rgba(217, 217, 217, 0.8)', inputType: 'color', idSuffix: 'media-controls-bg-even' }));
+        evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Own Post Border Colour:", storageKey: 'ownMsgBorderColorEven', cssVariable: '--otk-own-msg-border-color-even', defaultValue: '#c1d7ef', inputType: 'color', idSuffix: 'own-msg-border-even', requiresRerender: true }));
+        oddMessagesSection.appendChild(createThemeOptionRow({ labelText: "Own Post Border Colour:", storageKey: 'ownMsgBorderColorOdd', cssVariable: '--otk-own-msg-border-color-odd', defaultValue: '#c1d7ef', inputType: 'color', idSuffix: 'own-msg-border-odd', requiresRerender: true }));
+
+        // --- Misc Section ---
+        const miscSectionContent = createCollapsibleSubSection('Misc');
+        miscSectionContent.appendChild(createThemeOptionRow({ labelText: "Viewer Arrow Colour:", storageKey: 'viewerArrowColor', cssVariable: '--otk-viewer-arrow-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'viewer-arrow' }));
+        miscSectionContent.appendChild(createThemeOptionRow({ labelText: "Viewer Arrow Border Colour:", storageKey: 'viewerArrowBorderColor', cssVariable: '--otk-viewer-arrow-border-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'viewer-arrow-border' }));
+        miscSectionContent.appendChild(createThemeOptionRow({ labelText: "Replies Stat Colour:", storageKey: 'repliesStatColor', cssVariable: '--otk-replies-stat-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'replies-stat' }));
+        miscSectionContent.appendChild(createDropdownRow({
+            labelText: 'Replies Stat Animation:',
+            storageKey: 'repliesStatAnimation',
+            options: ['Flash', 'None'],
+            defaultValue: 'Flash',
+            requiresRerender: false
+        }));
+        miscSectionContent.appendChild(createThemeOptionRow({
+            labelText: "Replies Stat Animation Speed:",
+            storageKey: 'repliesStatAnimationSpeed',
+            cssVariable: '--otk-replies-stat-animation-speed',
+            defaultValue: '1',
+            inputType: 'number',
+            unit: null,
+            min: 0.1,
+            max: 10,
+            step: 0.1,
+            idSuffix: 'replies-stat-animation-speed',
+            requiresRerender: false
+        }));
+        themeOptionsContainer.appendChild(miscSectionContent);
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Media Menu Icon Colour:", storageKey: 'mediaMenuIconColor', cssVariable: '--otk-media-menu-icon-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'media-menu-icon' }));
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Header Underline Colour:", storageKey: 'viewerHeaderBorderColorEven', cssVariable: '--otk-viewer-header-border-color-even', defaultValue: '#777777', inputType: 'color', idSuffix: 'viewer-header-border-even', requiresRerender: true }));
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Font Size (px):", storageKey: 'msgDepthEvenContentFontSize', cssVariable: '--otk-msg-depth-even-content-font-size', defaultValue: '16px', inputType: 'number', unit: 'px', min: 8, max: 24, idSuffix: 'msg-depth-even-content-fontsize', requiresRerender: true }));
@@ -9925,6 +10056,10 @@ function setupFilterWindow() {
             .otk-option-row:nth-child(even) {
                 background-color: var(--otk-options-alt-bg-color);
                 border-radius: 4px;
+            }
+            @keyframes otk-flash {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
             }
         `;
         document.head.appendChild(styleElement);
