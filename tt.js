@@ -5220,15 +5220,16 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
             newUpArrow.id = 'otk-viewer-up-arrow';
             newUpArrow.innerHTML = '&#9650;';
             newUpArrow.style.cssText = `
-                position: absolute; top: 95px; right: 5px; cursor: pointer;
+                position: fixed; top: 95px; right: 5px; cursor: pointer;
                 font-size: 20px; color: var(--otk-viewer-arrow-color, #ff8040);
                 border-radius: 3px; padding: 0px 5px; z-index: 10000; display: none;
+                border: 1px solid var(--otk-viewer-arrow-border-color, #ff8040);
             `;
             newUpArrow.addEventListener('click', () => {
                 const messagesContainer = document.getElementById('otk-messages-container');
                 if (messagesContainer) messagesContainer.scrollTo({ top: 0, behavior: 'smooth' });
             });
-            otkGuiWrapper.appendChild(newUpArrow);
+            document.body.appendChild(newUpArrow);
         }
 
         const downArrow = document.getElementById('otk-viewer-down-arrow');
@@ -5237,15 +5238,16 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
             newDownArrow.id = 'otk-viewer-down-arrow';
             newDownArrow.innerHTML = '&#9660;';
             newDownArrow.style.cssText = `
-                position: absolute; top: 130px; right: 5px; cursor: pointer;
+                position: fixed; top: 130px; right: 5px; cursor: pointer;
                 font-size: 20px; color: var(--otk-viewer-arrow-color, #ff8040);
                 border-radius: 3px; padding: 0px 5px; z-index: 10000; display: none;
+                border: 1px solid var(--otk-viewer-arrow-border-color, #ff8040);
             `;
             newDownArrow.addEventListener('click', () => {
                 const messagesContainer = document.getElementById('otk-messages-container');
                 if (messagesContainer) messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
             });
-            otkGuiWrapper.appendChild(newDownArrow);
+            document.body.appendChild(newDownArrow);
         }
 
         otkViewer.style.cssText = `
