@@ -5214,39 +5214,7 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
             consoleLog('Viewer element already exists.');
         }
 
-        const upArrow = document.getElementById('otk-viewer-up-arrow');
-        if (!upArrow) {
-            const newUpArrow = document.createElement('div');
-            newUpArrow.id = 'otk-viewer-up-arrow';
-            newUpArrow.innerHTML = '&#9650;';
-            newUpArrow.style.cssText = `
-                position: absolute; top: 95px; right: 5px; cursor: pointer;
-                font-size: 20px; color: var(--otk-viewer-arrow-color, #ff8040);
-                border-radius: 3px; padding: 0px 5px; z-index: 10000; display: none;
-            `;
-            newUpArrow.addEventListener('click', () => {
-                const messagesContainer = document.getElementById('otk-messages-container');
-                if (messagesContainer) messagesContainer.scrollTo({ top: 0, behavior: 'smooth' });
-            });
-            otkGuiWrapper.appendChild(newUpArrow);
-        }
 
-        const downArrow = document.getElementById('otk-viewer-down-arrow');
-        if (!downArrow) {
-            const newDownArrow = document.createElement('div');
-            newDownArrow.id = 'otk-viewer-down-arrow';
-            newDownArrow.innerHTML = '&#9660;';
-            newDownArrow.style.cssText = `
-                position: absolute; top: 130px; right: 5px; cursor: pointer;
-                font-size: 20px; color: var(--otk-viewer-arrow-color, #ff8040);
-                border-radius: 3px; padding: 0px 5px; z-index: 10000; display: none;
-            `;
-            newDownArrow.addEventListener('click', () => {
-                const messagesContainer = document.getElementById('otk-messages-container');
-                if (messagesContainer) messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
-            });
-            otkGuiWrapper.appendChild(newDownArrow);
-        }
 
         otkViewer.style.cssText = `
             position: fixed;
@@ -5281,8 +5249,6 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
         }
 
         const isViewerVisible = otkViewer.style.display !== 'none';
-        const upArrow = document.getElementById('otk-viewer-up-arrow');
-        const downArrow = document.getElementById('otk-viewer-down-arrow');
 
         if (isViewerVisible) {
             const messagesContainer = document.getElementById('otk-messages-container');
@@ -5291,8 +5257,6 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
                 consoleLog(`Viewer closed. Scroll position saved: ${lastViewerScrollTop}`);
             }
             otkViewer.style.display = 'none';
-            if (upArrow) upArrow.style.display = 'none';
-            if (downArrow) downArrow.style.display = 'none';
             document.body.style.overflow = 'auto';
             localStorage.setItem(VIEWER_OPEN_KEY, 'false');
             for (const url of createdBlobUrls) {
@@ -5306,8 +5270,6 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
             updateDisplayedStatistics();
         } else {
             otkViewer.style.display = 'block';
-            if (upArrow) upArrow.style.display = 'block';
-            if (downArrow) downArrow.style.display = 'block';
             document.body.style.overflow = 'hidden';
             localStorage.setItem(VIEWER_OPEN_KEY, 'true');
             consoleLog('Viewer shown. State saved to localStorage. Applying layout and rendering all messages.');
@@ -8779,8 +8741,6 @@ function createThemeOptionRow(options) {
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Pin Icon:", storageKey: 'pinIconColorEven', cssVariable: '--otk-pin-icon-color-even', defaultValue: '#666666', inputType: 'color', idSuffix: 'pin-icon-even' }));
         // --- Misc Section ---
         const miscSectionContent = createCollapsibleSubSection('Misc');
-        miscSectionContent.appendChild(createThemeOptionRow({ labelText: "Viewer Arrow Colour:", storageKey: 'viewerArrowColor', cssVariable: '--otk-viewer-arrow-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'viewer-arrow' }));
-        miscSectionContent.appendChild(createThemeOptionRow({ labelText: "Viewer Arrow Border Colour:", storageKey: 'viewerArrowBorderColor', cssVariable: '--otk-viewer-arrow-border-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'viewer-arrow-border' }));
         miscSectionContent.appendChild(createThemeOptionRow({ labelText: "Replies Stat Colour:", storageKey: 'repliesStatColor', cssVariable: '--otk-replies-stat-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'replies-stat' }));
         miscSectionContent.appendChild(createThemeOptionRow({ labelText: "Pin Icon (Active):", storageKey: 'pinIconColorActive', cssVariable: '--otk-pin-icon-color-active', defaultValue: '#ff0000', inputType: 'color', idSuffix: 'pin-icon-active' }));
         miscSectionContent.appendChild(createDropdownRow({
