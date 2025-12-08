@@ -8725,6 +8725,7 @@ function createThemeOptionRow(options) {
         oddMessagesSection.appendChild(createThemeOptionRow({ labelText: "Media Controls BG (Odd):", storageKey: 'mediaControlsBgColorOdd', cssVariable: '--otk-media-controls-bg-color-odd', defaultValue: 'rgba(255, 255, 255, 0.8)', inputType: 'color', idSuffix: 'media-controls-bg-odd' }));
         oddMessagesSection.appendChild(createThemeOptionRow({ labelText: "Filter Icon:", storageKey: 'blockIconColorOdd', cssVariable: '--otk-block-icon-color-odd', defaultValue: '#999999', inputType: 'color', idSuffix: 'block-icon-odd' }));
         oddMessagesSection.appendChild(createThemeOptionRow({ labelText: "Pin Icon:", storageKey: 'pinIconColorOdd', cssVariable: '--otk-pin-icon-color-odd', defaultValue: '#666666', inputType: 'color', idSuffix: 'pin-icon-odd' }));
+        oddMessagesSection.appendChild(createThemeOptionRow({ labelText: "Pin Icon (Active):", storageKey: 'pinIconColorActiveOdd', cssVariable: '--otk-pin-icon-color-active-odd', defaultValue: '#ffffff', inputType: 'color', idSuffix: 'pin-icon-active-odd' }));
 
         // --- Messages (Evens) Section ---
         const evenMessagesSection = createCollapsibleSubSection('Messages (Evens)');
@@ -8739,10 +8740,10 @@ function createThemeOptionRow(options) {
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Media Menu Icon Colour:", storageKey: 'mediaMenuIconColor', cssVariable: '--otk-media-menu-icon-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'media-menu-icon' }));
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Filter Icon:", storageKey: 'blockIconColorEven', cssVariable: '--otk-block-icon-color-even', defaultValue: '#999999', inputType: 'color', idSuffix: 'block-icon-even' }));
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Pin Icon:", storageKey: 'pinIconColorEven', cssVariable: '--otk-pin-icon-color-even', defaultValue: '#666666', inputType: 'color', idSuffix: 'pin-icon-even' }));
+        evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Pin Icon (Active):", storageKey: 'pinIconColorActiveEven', cssVariable: '--otk-pin-icon-color-active-even', defaultValue: '#ffffff', inputType: 'color', idSuffix: 'pin-icon-active-even' }));
         // --- Misc Section ---
         const miscSectionContent = createCollapsibleSubSection('Misc');
         miscSectionContent.appendChild(createThemeOptionRow({ labelText: "Replies Stat Colour:", storageKey: 'repliesStatColor', cssVariable: '--otk-replies-stat-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'replies-stat' }));
-        miscSectionContent.appendChild(createThemeOptionRow({ labelText: "Pin Icon (Active):", storageKey: 'pinIconColorActive', cssVariable: '--otk-pin-icon-color-active', defaultValue: '#ff0000', inputType: 'color', idSuffix: 'pin-icon-active' }));
         miscSectionContent.appendChild(createDropdownRow({
             labelText: 'New Messages Stat Animation:',
             storageKey: 'newMessagesStatAnimation',
@@ -9843,7 +9844,8 @@ function setupFilterWindow() {
                 --otk-block-icon-color-even: #999999;
                 --otk-pin-icon-color-odd: #666666;
                 --otk-pin-icon-color-even: #666666;
-                --otk-pin-icon-color-active: #ffffff;
+                --otk-pin-icon-color-active-odd: #ffffff;
+                --otk-pin-icon-color-active-even: #ffffff;
                 --otk-media-controls-bg-color-odd: rgba(255, 255, 255, 0.8);
                 --otk-media-controls-bg-color-even: rgba(217, 217, 217, 0.8);
                 --otk-media-menu-icon-color: #ff8040;
@@ -9932,8 +9934,11 @@ function setupFilterWindow() {
             .otk-message-depth-even .otk-pin-icon {
                 color: var(--otk-pin-icon-color-even);
             }
-            .${PINNED_MESSAGE_CLASS} > div:first-child .otk-pin-icon {
-                color: var(--otk-pin-icon-color-active);
+            .otk-message-depth-odd.${PINNED_MESSAGE_CLASS} > div:first-child .otk-pin-icon {
+                color: var(--otk-pin-icon-color-active-odd);
+            }
+            .otk-message-depth-even.${PINNED_MESSAGE_CLASS} > div:first-child .otk-pin-icon {
+                color: var(--otk-pin-icon-color-active-even);
             }
                 .otk-youtube-embed-wrapper.otk-embed-inline {
                     /* max-width and margins are now controlled by inline styles in createYouTubeEmbedElement */
