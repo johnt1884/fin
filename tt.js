@@ -8745,43 +8745,22 @@ function createThemeOptionRow(options) {
         const miscSectionContent = createCollapsibleSubSection('Misc');
         miscSectionContent.appendChild(createThemeOptionRow({ labelText: "Replies Stat Colour:", storageKey: 'repliesStatColor', cssVariable: '--otk-replies-stat-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'replies-stat' }));
         miscSectionContent.appendChild(createDropdownRow({
-            labelText: 'New Messages Stat Animation:',
-            storageKey: 'newMessagesStatAnimation',
+            labelText: 'Tab Title Stats Animation:',
+            storageKey: 'tabTitleStatsAnimation',
             options: ['Flash', 'None'],
             defaultValue: 'Flash',
             requiresRerender: false
         }));
         miscSectionContent.appendChild(createThemeOptionRow({
-            labelText: "New Messages Stat Animation Speed:",
-            storageKey: 'newMessagesStatAnimationSpeed',
-            cssVariable: '--otk-new-messages-stat-animation-speed',
+            labelText: "Tab Title Stats Animation Speed:",
+            storageKey: 'tabTitleStatsAnimationSpeed',
             defaultValue: '1',
             inputType: 'number',
             unit: null,
             min: 0.1,
             max: 10,
             step: 0.1,
-            idSuffix: 'new-messages-stat-animation-speed',
-            requiresRerender: false
-        }));
-        miscSectionContent.appendChild(createDropdownRow({
-            labelText: 'Replies Stat Animation:',
-            storageKey: 'repliesStatAnimation',
-            options: ['Flash', 'None'],
-            defaultValue: 'Flash',
-            requiresRerender: false
-        }));
-        miscSectionContent.appendChild(createThemeOptionRow({
-            labelText: "Replies Stat Animation Speed:",
-            storageKey: 'repliesStatAnimationSpeed',
-            cssVariable: '--otk-replies-stat-animation-speed',
-            defaultValue: '1',
-            inputType: 'number',
-            unit: null,
-            min: 0.1,
-            max: 10,
-            step: 0.1,
-            idSuffix: 'replies-stat-animation-speed',
+            idSuffix: 'tab-title-stats-animation-speed',
             requiresRerender: false
         }));
         themeOptionsContainer.appendChild(miscSectionContent);
