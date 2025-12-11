@@ -5510,6 +5510,7 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
 
     function setupTitleObserver() {
         const targetNode = document.getElementById('otk-stat-new-messages');
+        const newRepliesNode = document.getElementById('otk-stat-new-replies');
         if (!targetNode) {
             consoleError("Could not find the target node for title observer: #otk-stat-new-messages");
             return;
@@ -9665,6 +9666,53 @@ function setupFilterWindow() {
         console.log("Default settings applied if not already present.");
     }
 
+
+function setupTitleObserver() {
+    const totalMessagesNode = document.getElementById('otk-total-messages-stat');
+
+    if (!totalMessagesNode) {
+        console.warn('[TitleObserver] Could not find the total messages stat node for title updates.');
+        return;
+    }
+
+    const updateTitle = () => {
+        const newMessagesNode = totalMessagesNode.querySelector('#otk-stat-new-messages');
+        const newRepliesNode = totalMessagesNode.querySelector('#otk-stat-new-replies');
+
+        const newMessagesText = (newMessagesNode?.textContent || '').trim();
+        const newRepliesText = (newRepliesNode?.textContent || '').trim();
+
+        let titlePrefix = '';
+        const hasMessages = newMessagesText.length > 0;
+        const hasReplies = newRepliesText.length > 0;
+
+        if (hasMessages && hasReplies) {
+            const msgCount = newMessagesText.replace(/\D/g, '');
+            const replyCount = newRepliesText.replace(/\D/g, '');
+            titlePrefix = `(${msgCount} | ${replyCount}) `;
+        } else if (hasMessages) {
+            titlePrefix = `${newMessagesText} `;
+        } else if (hasReplies) {
+            const replyCount = newRepliesText.replace(/\D/g, '');
+            titlePrefix = `(0 | ${replyCount}) `;
+        }
+
+        if (document.title !== originalTitle && !document.title.startsWith('(')) {
+            originalTitle = document.title;
+        }
+
+        document.title = titlePrefix + originalTitle;
+    };
+
+    const observer = new MutationObserver(updateTitle);
+
+    const observerConfig = { childList: true, subtree: true, characterData: true };
+
+    observer.observe(totalMessagesNode, observerConfig);
+
+    updateTitle();
+}
+
     async function main() {
         applyDefaultSettings();
         // Ensure default animation speed is set on first run
@@ -10523,3 +10571,4 @@ function setupTimezoneSearch() {
 }
 
 })();
+
