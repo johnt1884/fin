@@ -5508,32 +5508,29 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
         }
     }
 
-    function setupTitleObserver() {
-        const targetNode = document.getElementById('otk-stat-new-messages');
-        const newRepliesNode = document.getElementById('otk-stat-new-replies');
-        if (!targetNode) {
-            consoleError("Could not find the target node for title observer: #otk-stat-new-messages");
-            return;
+            titleFlashingInterval = null;
         }
 
-        const observer = new MutationObserver(mutations => {
-            mutations.forEach(mutation => {
-                const newMessagesText = targetNode.textContent.trim();
-                if (newMessagesText) {
-                    document.title = `${newMessagesText} ${originalTitle}`;
-                } else {
-                    document.title = originalTitle;
-                }
-            });
-        });
+        if (animationType === 'Flash' && (hasMessages || hasReplies)) {
+            let isOriginalTitle = false;
+            titleFlashingInterval = setInterval(() => {
+                if (tabHidden) return; // Don't animate if tab is hidden to save resources
+                document.title = isOriginalTitle ? titlePrefix + originalTitle : originalTitle;
+                isOriginalTitle = !isOriginalTitle;
+            }, intervalTime);
+        } else {
+            document.title = titlePrefix + originalTitle;
+        }
+    };
 
-        observer.observe(targetNode, {
-            childList: true,
-            characterData: true,
-            subtree: true
-        });
+    const observer = new MutationObserver(updateTitle);
 
-        consoleLog("Title observer is set up and watching for changes on #otk-stat-new-messages.");
+    const observerConfig = { childList: true, subtree: true, characterData: true };
+
+    observer.observe(totalMessagesNode, observerConfig);
+
+    updateTitle();
+}
     }
 
     function createTrackerButton(text, id = null) {
@@ -8456,6 +8453,7 @@ function createThemeOptionRow(options) {
         guiSectionContent.appendChild(createThemeOptionRow({ labelText: "Thread(s) Stats Font Colour:", storageKey: 'actualStatsTextColor', cssVariable: '--otk-stats-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'actual-stats-text' }));
         guiSectionContent.appendChild(createThemeOptionRow({ labelText: "Thread(s) Stats Bullet point Colour:", storageKey: 'statsDashColor', cssVariable: '--otk-stats-dash-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'stats-dash' }));
         guiSectionContent.appendChild(createThemeOptionRow({ labelText: "Background Updates Stats Font Colour:", storageKey: 'backgroundUpdatesStatsTextColor', cssVariable: '--otk-background-updates-stats-text-color', defaultValue: '#FFD700', inputType: 'color', idSuffix: 'background-updates-stats-text' }));
+        guiSectionContent.appendChild(createThemeOptionRow({ labelText: "Replies Stat Colour:", storageKey: 'repliesStatColor', cssVariable: '--otk-replies-stat-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'replies-stat' }));
 
         guiSectionContent.appendChild(createThemeOptionRow({ labelText: "Options Icon Colour:", storageKey: 'cogIconColor', cssVariable: '--otk-cog-icon-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'cog-icon' }));
         guiSectionContent.appendChild(createThemeOptionRow({ labelText: "Background Updates Background Colour:", storageKey: 'countdownBgColor', cssVariable: '--otk-countdown-bg-color', defaultValue: '#181818', inputType: 'color', idSuffix: 'countdown-bg' }));
@@ -8744,7 +8742,6 @@ function createThemeOptionRow(options) {
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Pin Icon (Active):", storageKey: 'pinIconColorActiveEven', cssVariable: '--otk-pin-icon-color-active-even', defaultValue: '#ffffff', inputType: 'color', idSuffix: 'pin-icon-active-even' }));
         // --- Misc Section ---
         const miscSectionContent = createCollapsibleSubSection('Misc');
-        miscSectionContent.appendChild(createThemeOptionRow({ labelText: "Replies Stat Colour:", storageKey: 'repliesStatColor', cssVariable: '--otk-replies-stat-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'replies-stat' }));
         miscSectionContent.appendChild(createDropdownRow({
             labelText: 'Tab Title Stats Animation:',
             storageKey: 'tabTitleStatsAnimation',
@@ -9701,7 +9698,26 @@ function setupTitleObserver() {
             originalTitle = document.title;
         }
 
-        document.title = titlePrefix + originalTitle;
+        const themeSettings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
+        const animationType = themeSettings.tabTitleStatsAnimation || 'Flash';
+        const animationSpeed = parseFloat(themeSettings.tabTitleStatsAnimationSpeed || '1');
+        const intervalTime = 1000 / animationSpeed;
+
+        if (titleFlashingInterval) {
+            clearInterval(titleFlashingInterval);
+            titleFlashingInterval = null;
+        }
+
+        if (animationType === 'Flash' && (hasMessages || hasReplies)) {
+            let isOriginalTitle = false;
+            titleFlashingInterval = setInterval(() => {
+                if (tabHidden) return; // Don't animate if tab is hidden to save resources
+                document.title = isOriginalTitle ? titlePrefix + originalTitle : originalTitle;
+                isOriginalTitle = !isOriginalTitle;
+            }, intervalTime);
+        } else {
+            document.title = titlePrefix + originalTitle;
+        }
     };
 
     const observer = new MutationObserver(updateTitle);
@@ -9711,6 +9727,7 @@ function setupTitleObserver() {
     observer.observe(totalMessagesNode, observerConfig);
 
     updateTitle();
+}
 }
 
     async function main() {
