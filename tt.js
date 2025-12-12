@@ -5337,6 +5337,7 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
             consoleWarn('One or more statistics elements not found in GUI.');
             return;
         }
+    console.log(`[StatsDebug] updateDisplayedStatistics called with newMessages: ${newMessagesCount}, newReplies: ${newRepliesCount}`);
 
         const getOldStatValue = (id) => {
             const elem = document.getElementById(`otk-stat-new-${id}`);
