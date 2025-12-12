@@ -5508,6 +5508,46 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
         }
     }
 
+    function setupTitleObserver() {
+        const targetNode = document.getElementById('otk-stat-new-messages');
+        const newRepliesNode = document.getElementById('otk-stat-new-replies');
+        if (!targetNode) {
+            consoleError("Could not find the target node for title observer: #otk-stat-new-messages");
+            return;
+        }
+
+        const observer = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+                const newMessagesText = targetNode.textContent.trim();
+                if (newMessagesText) {
+                    document.title = `${newMessagesText} ${originalTitle}`;
+                } else {
+                    document.title = originalTitle;
+                }
+            });
+        });
+
+        observer.observe(targetNode, {
+            childList: true,
+            characterData: true,
+            subtree: true
+        });
+
+        consoleLog("Title observer is set up and watching for changes on #otk-stat-new-messages.");
+    }
+
+    function createTrackerButton(text, id = null) {
+        const button = document.createElement('button');
+        if (id) button.id = id;
+        button.textContent = text;
+        button.classList.add('otk-tracker-button'); // Add a common class for potential shared base styles not from variables
+        button.style.cssText = `
+            padding: 12px 15px;
+            cursor: pointer;
+            background-color: var(--otk-button-bg-color);
+            color: var(--otk-button-text-color);
+            border: 1px solid var(--otk-button-border-color);
+            border-radius: 3px;
             font-size: 13px;
             white-space: nowrap; /* Prevent button text wrapping */
             /* Transition for smooth background color change can be added here or in CSS */
@@ -8702,9 +8742,9 @@ function createThemeOptionRow(options) {
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Filter Icon:", storageKey: 'blockIconColorEven', cssVariable: '--otk-block-icon-color-even', defaultValue: '#999999', inputType: 'color', idSuffix: 'block-icon-even' }));
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Pin Icon:", storageKey: 'pinIconColorEven', cssVariable: '--otk-pin-icon-color-even', defaultValue: '#666666', inputType: 'color', idSuffix: 'pin-icon-even' }));
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Pin Icon (Active):", storageKey: 'pinIconColorActiveEven', cssVariable: '--otk-pin-icon-color-active-even', defaultValue: '#ffffff', inputType: 'color', idSuffix: 'pin-icon-active-even' }));
-        guiSectionContent.appendChild(createThemeOptionRow({ labelText: "Replies Stat Colour:", storageKey: 'repliesStatColor', cssVariable: '--otk-replies-stat-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'replies-stat' }));
         // --- Misc Section ---
         const miscSectionContent = createCollapsibleSubSection('Misc');
+        miscSectionContent.appendChild(createThemeOptionRow({ labelText: "Replies Stat Colour:", storageKey: 'repliesStatColor', cssVariable: '--otk-replies-stat-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'replies-stat' }));
         miscSectionContent.appendChild(createDropdownRow({
             labelText: 'Tab Title Stats Animation:',
             storageKey: 'tabTitleStatsAnimation',
@@ -9645,6 +9685,193 @@ function setupTitleObserver() {
         let titlePrefix = '';
         const hasMessages = newMessagesText.length > 0;
         const hasReplies = newRepliesText.length > 0;
+
+        if (hasMessages && hasReplies) {
+            const msgCount = newMessagesText.replace(/\D/g, '');
+            const replyCount = newRepliesText.replace(/\D/g, '');
+            titlePrefix = `(${msgCount} | ${replyCount}) `;
+        } else if (hasMessages) {
+            titlePrefix = `${newMessagesText} `;
+        } else if (hasReplies) {
+            const replyCount = newRepliesText.replace(/\D/g, '');
+            titlePrefix = `(0 | ${replyCount}) `;
+        }
+
+        if (document.title !== originalTitle && !document.title.startsWith('(')) {
+            originalTitle = document.title;
+        }
+
+        document.title = titlePrefix + originalTitle;
+    };
+
+    const observer = new MutationObserver(updateTitle);
+
+    const observerConfig = { childList: true, subtree: true, characterData: true };
+
+    observer.observe(totalMessagesNode, observerConfig);
+
+    updateTitle();
+}
+
+    async function main() {
+        applyDefaultSettings();
+        // Ensure default animation speed is set on first run
+        let settings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
+        if (settings.otkThreadTitleAnimationSpeed === undefined) {
+            settings.otkThreadTitleAnimationSpeed = '1';
+            localStorage.setItem(THEME_SETTINGS_KEY, JSON.stringify(settings));
+            consoleLog("Initialized default animation speed to 1.");
+        }
+
+        // Migration: Remove old filter rules key if it exists
+        if (localStorage.getItem('otkFilterRules')) {
+            localStorage.removeItem('otkFilterRules');
+            consoleLog('[Migration] Removed outdated otkFilterRules from localStorage.');
+        }
+
+        // Clock data migration
+        if (!localStorage.getItem('otkClocks')) {
+            const oldTimezone = localStorage.getItem('otkClockTimezone');
+            const oldDisplayPlace = localStorage.getItem('otkClockDisplayPlace');
+            let initialClocks = [];
+            if (oldTimezone) {
+                initialClocks.push({
+                    id: Date.now(),
+                    timezone: oldTimezone,
+                    displayPlace: oldDisplayPlace || oldTimezone.split('/').pop().replace(/_/g, ' ')
+                });
+            } else {
+                // Default clock if no old settings exist
+                initialClocks.push({
+                    id: Date.now(),
+                    timezone: 'America/Chicago',
+                    displayPlace: 'Chicago'
+                });
+            }
+            localStorage.setItem('otkClocks', JSON.stringify(initialClocks));
+            consoleLog('Clock settings migrated to new multi-clock format.');
+        }
+
+        consoleLog("Starting OTK Thread Tracker script (v2.8)...");
+
+        try {
+            const storedBlurred = JSON.parse(localStorage.getItem(BLURRED_IMAGES_KEY));
+            if (Array.isArray(storedBlurred)) {
+                blurredImages = new Set(storedBlurred);
+            }
+            consoleLog(`Loaded ${blurredImages.size} blurred image hashes.`);
+        } catch (e) {
+            consoleError("Error parsing blurred images from localStorage:", e);
+            blurredImages = new Set();
+        }
+
+        try {
+            const storedBlocked = JSON.parse(localStorage.getItem(BLOCKED_THREADS_KEY));
+            if (Array.isArray(storedBlocked)) {
+                blockedThreads = new Set(storedBlocked);
+            }
+            consoleLog(`Loaded ${blockedThreads.size} blocked thread hashes.`);
+        } catch (e) {
+            consoleError("Error parsing blocked threads from localStorage:", e);
+            blockedThreads = new Set();
+        }
+
+        loadUserPostIds();
+
+        // Inject CSS for anchored messages
+        const styleElement = document.createElement('style');
+        styleElement.textContent = `
+            :root {
+                --otk-clock-cog-color: #FFD700;
+                --otk-clock-bg-color: #181818;
+                --otk-clock-text-color: #e6e6e6;
+                --otk-clock-border-color: #181818;
+                --otk-clock-search-bg-color: #333;
+                --otk-clock-search-text-color: #e6e6e6;
+                --otk-countdown-bg-color: #181818;
+                --otk-gui-bg-color: #181818;
+                --otk-gui-text-color: #e6e6e6; /* General text in the main GUI bar */
+                --otk-options-text-color: #e6e6e6; /* For text within the options panel */
+                --otk-title-text-color: #ff8040; /* Default for main title */
+                --otk-stats-text-color: #e6e6e6; /* For the actual stats text numbers in GUI bar */
+                --otk-stats-dash-color: #FFD700; /* For the dashes in the stats display */
+                --otk-background-updates-stats-text-color: #FFD700; /* For the 'new' stats text */
+                --otk-viewer-bg-color: #ffd1a4;
+                --otk-gui-threadlist-title-color: #e0e0e0;
+                --otk-gui-threadlist-time-color: #FFD700;
+                /* Message Styles (Odd Depths: 0, 2, 4...) */
+                --otk-msg-depth-odd-content-font-size: 16px;
+                --otk-msg-depth-odd-bg-color: #ffffff;
+                --otk-msg-depth-odd-text-color: #333333;
+                --otk-msg-depth-odd-header-text-color: #555555;
+                --otk-viewer-header-border-color-odd: #000000;
+
+                /* Message Styles (Even Depths: 1, 3, 5...) */
+                --otk-own-msg-bg-color-odd: #d1e7ff;
+                --otk-own-msg-bg-color-even: #c1d7ef;
+                --otk-msg-depth-even-content-font-size: 16px;
+                --otk-msg-depth-even-bg-color: #d9d9d9;
+                --otk-msg-depth-even-text-color: #333333;
+                --otk-msg-depth-even-header-text-color: #555555;
+                --otk-viewer-header-border-color-even: #777777;
+
+                --otk-viewer-message-font-size: 13px; /* Default font size for message text - remains common */
+                --otk-gui-bottom-border-color: #ff8040; /* Default for GUI bottom border - remains common */
+                --otk-cog-icon-color: #FFD700; /* Default for settings cog icon */
+                --otk-disable-bg-font-color: #ff8040; /* Default for "Disable Background Updates" text */
+                --otk-countdown-timer-text-color: #ff8040; /* Default for countdown timer text */
+                --otk-new-messages-divider-color: #000000; /* Default for new message separator line */
+                --otk-new-messages-font-color: #000000; /* Default for new message separator text */
+                --otk-new-messages-font-size: 16px;
+
+                /* New Depth-Specific Content Font Sizes */
+                --otk-msg-depth0-content-font-size: 16px;
+                --otk-msg-depth1-content-font-size: 16px;
+                --otk-msg-depth2plus-content-font-size: 16px;
+
+                /* GUI Button Colors */
+                --otk-button-bg-color: #555;
+                --otk-button-text-color: white;
+                --otk-button-border-color: #777;
+                --otk-button-hover-bg-color: #666;
+                --otk-button-active-bg-color: #444444; /* Ensured hex */
+
+                /* Loading Screen Colors */
+                --otk-loading-overlay-base-hex-color: #000000; /* Hex base for overlay */
+                --otk-loading-overlay-opacity: 1.0;
+                --otk-loading-text-color: #ffffff; /* Hex for white */
+                --otk-loading-progress-bar-bg-color: #333333; /* Hex for dark grey */
+                --otk-loading-progress-bar-fill-color: #4CAF50; /* Already hex */
+                --otk-loading-progress-bar-text-color: #ffffff; /* Hex for white */
+                /* Add more variables here as they are identified */
+
+                /* Anchor Highlight Colors */
+                --otk-pin-highlight-bg-color: #ffd1a4;    /* Default: dark yellow/greenish */
+                --otk-pin-highlight-border-color: #000000; /* Default: gold */
+
+                /* Icon Colors */
+                --otk-plus-icon-bg-color: #d9d9d9;
+                --otk-plus-icon-color: #000000;
+                --otk-resize-icon-color: #000000;
+                --otk-resize-icon-bg-color: #d9d9d9;
+                --otk-blur-icon-color: #000000;
+                --otk-blur-icon-bg-color: #d9d9d9;
+                --otk-blocked-content-font-color: #e6e6e6;
+
+                /* QR Theming */
+                --otk-qr-bg-color: #333333;
+                --otk-qr-border-color: #555555;
+                --otk-qr-header-bg-color: #444444;
+                --otk-qr-header-text-color: #ffffff;
+                --otk-qr-textarea-bg-color: #222222;
+                --otk-qr-textarea-text-color: #eeeeee;
+
+                /* Message Header Icon Colors */
+                --otk-block-icon-color-odd: #999999;
+                --otk-block-icon-color-even: #999999;
+                --otk-pin-icon-color-odd: #666666;
+                --otk-pin-icon-color-even: #666666;
+                --otk-pin-icon-color-active-odd: #ffffff;
                 --otk-pin-icon-color-active-even: #ffffff;
                 --otk-media-controls-bg-color-odd: rgba(255, 255, 255, 0.8);
                 --otk-media-controls-bg-color-even: rgba(217, 217, 217, 0.8);
