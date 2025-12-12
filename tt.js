@@ -9120,57 +9120,6 @@ function renderFilterEditorView(ruleToEdit = null) {
         };
 
         if (!newRuleData.matchContent) {
-            alert('Match Content cannot be empty.');
-            return false;
-        }
-
-        let currentRules = JSON.parse(localStorage.getItem(FILTER_RULES_V2_KEY) || '[]');
-        const ruleIndex = currentRules.findIndex(r => r.id === rule.id);
-
-        if (ruleIndex > -1) {
-            currentRules[ruleIndex] = newRuleData;
-        } else {
-            currentRules.push(newRuleData);
-        }
-        localStorage.setItem(FILTER_RULES_V2_KEY, JSON.stringify(currentRules));
-        return true;
-    };
-
-    // Buttons
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.cssText = 'display: flex; justify-content: flex-end; gap: 10px; margin-top: auto;';
-
-    const saveBtn = createTrackerButton(isEditing ? 'Save Changes' : 'Create Filter');
-    saveBtn.addEventListener('click', () => {
-        if (saveRuleLogic()) {
-            renderFilterList();
-        }
-    });
-
-    const cancelBtn = createTrackerButton('Cancel');
-    cancelBtn.addEventListener('click', () => {
-        renderFilterList();
-    });
-
-    const saveAndCloseBtn = createTrackerButton(isEditing ? 'Save and Close' : 'Create Filter and Close');
-    saveAndCloseBtn.addEventListener('click', () => {
-        if (saveRuleLogic()) {
-            document.getElementById('otk-filter-window').style.display = 'none';
-        }
-    });
-
-    buttonContainer.appendChild(cancelBtn);
-    buttonContainer.appendChild(saveBtn);
-    buttonContainer.appendChild(saveAndCloseBtn);
-    form.appendChild(buttonContainer);
-
-    rightContent.appendChild(form);
-}
-function renderFilterList() {
-    const rightContent = document.getElementById('otk-filter-content');
-    if (!rightContent) return;
-    rightContent.innerHTML = ''; // Clear previous content
-
     const header = document.createElement('div');
     header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-right: 15px;'; // Add padding for scrollbar
 
