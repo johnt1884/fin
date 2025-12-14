@@ -13,6 +13,46 @@
     'use strict';
 
     // --- IIFE Scope Helper for Intersection Observer ---
+    function flashStuff(newMessages, newReplies) {
+    const themeSettings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
+    if (themeSettings.tabTitleStatsAnimation !== 'Flash') {
+        if (titleFlashingInterval) {
+            clearInterval(titleFlashingInterval);
+            titleFlashingInterval = null;
+        }
+        document.title = originalTitle; // Restore original title when animation is disabled
+        return;
+    }
+
+    if (titleFlashingInterval) {
+        clearInterval(titleFlashingInterval);
+    }
+
+    let isOriginalTitle = true;
+    const speed = parseFloat(themeSettings.tabTitleStatsAnimationSpeed) || 1.0;
+    const intervalDuration = 1000 / speed;
+
+    titleFlashingInterval = setInterval(() => {
+        if (tabHidden) { // Only flash when tab is not active
+            if (isOriginalTitle) {
+                let titlePrefix = '';
+                if (newMessages > 0 && newReplies > 0) {
+                    titlePrefix = `(${newMessages}|${newReplies}) `;
+                } else if (newMessages > 0) {
+                    titlePrefix = `(${newMessages}) `;
+                } else if (newReplies > 0) {
+                    titlePrefix = `(0|${newReplies}) `;
+                }
+                document.title = titlePrefix + originalTitle;
+            } else {
+                document.title = originalTitle;
+            }
+            isOriginalTitle = !isOriginalTitle;
+        } else {
+            document.title = originalTitle; // Keep original title when tab is active
+        }
+    }, intervalDuration);
+}
     function handleIntersection(entries, observerInstance) {
         entries.forEach(entry => {
             const wrapper = entry.target;
@@ -10106,7 +10146,7 @@ function setupTitleObserver() {
 
                 consoleLog("OTK Thread Tracker script initialized and running.");
 
-                setupTitleObserver();
+                // setupTitleObserver();
 
             } catch (error) {
                 consoleError("Critical error during main initialization sequence:", error);
@@ -10571,4 +10611,5 @@ function setupTimezoneSearch() {
 }
 
 })();
+
 
