@@ -1207,6 +1207,45 @@ function createTweetEmbedElement(tweetId) {
             height: 100%;               /* Occupy full height of parent for space-between */
         `;
         otkGui.appendChild(buttonContainer);
+
+        // Scroll buttons
+        const scrollButtonContainer = document.createElement('div');
+        scrollButtonContainer.id = 'otk-scroll-button-container';
+        scrollButtonContainer.style.cssText = `
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+        `;
+
+        const scrollTopButton = document.createElement('div');
+        scrollTopButton.id = 'otk-scroll-top-btn';
+        scrollTopButton.innerHTML = '&#9650;'; // Chevron Up
+        scrollTopButton.title = 'Scroll to top';
+        scrollTopButton.style.cssText = `
+            cursor: pointer;
+            font-size: 16px;
+            color: var(--otk-gui-text-color);
+        `;
+
+        const scrollBottomButton = document.createElement('div');
+        scrollBottomButton.id = 'otk-scroll-bottom-btn';
+        scrollBottomButton.innerHTML = '&#9660;'; // Chevron Down
+        scrollBottomButton.title = 'Scroll to bottom';
+        scrollBottomButton.style.cssText = `
+            cursor: pointer;
+            font-size: 16px;
+            color: var(--otk-gui-text-color);
+        `;
+
+        scrollButtonContainer.appendChild(scrollTopButton);
+        scrollButtonContainer.appendChild(scrollBottomButton);
+        otkGui.appendChild(scrollButtonContainer);
     } else { // If GUI wrapper exists, ensure consistency
         if (document.body.style.paddingTop !== '89px') {
             document.body.style.paddingTop = '89px';
@@ -2218,6 +2257,7 @@ function createThreadListItemElement(thread, isForTooltip = false) {
             event.preventDefault();
             if (otkViewer && otkViewer.style.display === 'none') toggleViewer();
             else if (otkViewer && otkViewer.style.display !== 'block') { otkViewer.style.display = 'block'; document.body.style.overflow = 'hidden'; renderMessagesInViewer(); }
+            if (scrollButtonContainer) scrollButtonContainer.style.display = 'flex';
             setTimeout(() => {
                 const messagesContainer = document.getElementById('otk-messages-container');
                 if (messagesContainer) {
@@ -5352,6 +5392,7 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
         consoleLog("Applied basic styling to otkViewer: background #181818, default text color #e6e6e6, padding (0), border-top #181818, overflow-x: hidden.");
     }
 
+const scrollButtonContainer = document.getElementById('otk-scroll-button-container');
     function toggleViewer() {
         if (!otkViewer) {
             consoleWarn('Viewer element not found. Attempting to create.');
@@ -5371,6 +5412,7 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
                 consoleLog(`Viewer closed. Scroll position saved: ${lastViewerScrollTop}`);
             }
             otkViewer.style.display = 'none';
+            if (scrollButtonContainer) scrollButtonContainer.style.display = 'none';
             document.body.style.overflow = 'auto';
             localStorage.setItem(VIEWER_OPEN_KEY, 'false');
             for (const url of createdBlobUrls) {
@@ -5384,6 +5426,7 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
             updateDisplayedStatistics();
         } else {
             otkViewer.style.display = 'block';
+            if (scrollButtonContainer) scrollButtonContainer.style.display = 'flex';
             document.body.style.overflow = 'hidden';
             localStorage.setItem(VIEWER_OPEN_KEY, 'true');
             consoleLog('Viewer shown. State saved to localStorage. Applying layout and rendering all messages.');
@@ -9827,6 +9870,25 @@ function setupTitleObserver() {
     updateTitle();
 }
 
+function setupScrollButtons() {
+    const scrollTopButton = document.getElementById('otk-scroll-top-btn');
+    const scrollBottomButton = document.getElementById('otk-scroll-bottom-btn');
+
+    scrollTopButton.addEventListener('click', () => {
+        const messagesContainer = document.getElementById('otk-messages-container');
+        if (messagesContainer) {
+            messagesContainer.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    });
+
+    scrollBottomButton.addEventListener('click', () => {
+        const messagesContainer = document.getElementById('otk-messages-container');
+        if (messagesContainer) {
+            messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+        }
+    });
+}
+
     async function main() {
         applyDefaultSettings();
         // Ensure default animation speed is set on first run
@@ -10196,6 +10258,7 @@ function setupTitleObserver() {
                     otkViewer.classList.remove('otk-message-layout-newdesign');
                     consoleLog('Viewer state restored to open. Layout class applied. Rendering all messages.');
                     otkViewer.style.display = 'block';
+            if (scrollButtonContainer) scrollButtonContainer.style.display = 'flex';
                     document.body.style.overflow = 'hidden';
                     renderMessagesInViewer({isToggleOpen: true}); // Auto-populate with all messages
                 }
@@ -10234,6 +10297,7 @@ function setupTitleObserver() {
 
 
                 setupTitleObserver();
+        setupScrollButtons();
 
             } catch (error) {
                 consoleError("Critical error during main initialization sequence:", error);
