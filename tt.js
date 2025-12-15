@@ -12,6 +12,80 @@
 (function() {
     'use strict';
 
+function createStatsDisplayElements(statsWrapperParam) {
+    const statsWrapper = statsWrapperParam || document.getElementById('otk-stats-wrapper');
+
+    if (!statsWrapper) {
+        consoleWarn('[createStatsDisplayElements] otk-stats-wrapper not found. Cannot create stats display.');
+        return null;
+    }
+
+    // Check if stats display is already a child of statsWrapper
+    if (statsWrapper.querySelector('#otk-stats-display')) {
+        return;
+    }
+
+    const otkStatsDisplay = document.createElement('div');
+    otkStatsDisplay.id = 'otk-stats-display';
+    otkStatsDisplay.style.cssText = `
+        font-size: 11px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        width: fit-content;
+        min-width: 200px; /* Reserve space for (+n) */
+    `;
+
+    const threadsTrackedStat = document.createElement('div');
+    threadsTrackedStat.id = 'otk-threads-tracked-stat';
+    threadsTrackedStat.style.cssText = `
+        display: flex;
+        align-items: center;
+        color: var(--otk-stats-text-color);
+        min-width: 200px; /* Prevent shifting from (+n) */
+        white-space: nowrap;
+    `;
+
+    const totalMessagesStat = document.createElement('div');
+    totalMessagesStat.id = 'otk-total-messages-stat';
+    totalMessagesStat.style.cssText = `
+        display: flex;
+        align-items: center;
+        color: var(--otk-stats-text-color);
+        min-width: 200px;
+        white-space: nowrap;
+    `;
+
+    const localImagesStat = document.createElement('div');
+    localImagesStat.id = 'otk-local-images-stat';
+    localImagesStat.style.cssText = `
+        display: flex;
+        align-items: center;
+        color: var(--otk-stats-text-color);
+        min-width: 200px;
+        white-space: nowrap;
+    `;
+
+    const localVideosStat = document.createElement('div');
+    localVideosStat.id = 'otk-local-videos-stat';
+    localVideosStat.style.cssText = `
+        display: flex;
+        align-items: center;
+        color: var(--otk-stats-text-color);
+        min-width: 200px;
+        white-space: nowrap;
+    `;
+
+    otkStatsDisplay.appendChild(threadsTrackedStat);
+    otkStatsDisplay.appendChild(totalMessagesStat);
+    otkStatsDisplay.appendChild(localImagesStat);
+    otkStatsDisplay.appendChild(localVideosStat);
+
+    statsWrapper.appendChild(otkStatsDisplay);
+
+    return otkStatsDisplay;
+}
+
     // --- IIFE Scope Helper for Intersection Observer ---
     function flashStuff(newMessages, newReplies) {
     const themeSettings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
@@ -10145,6 +10219,19 @@ function setupTitleObserver() {
                 }
 
                 consoleLog("OTK Thread Tracker script initialized and running.");
+                const observer = new MutationObserver((mutationsList, observer) => {
+                    for(const mutation of mutationsList) {
+                        if (mutation.type === 'childList') {
+                            const statsWrapper = document.getElementById('otk-stats-wrapper');
+                            if (statsWrapper) {
+                                createStatsDisplayElements(statsWrapper);
+                                observer.disconnect(); // We found it, no need to observe anymore
+                            }
+                        }
+                    }
+                });
+                observer.observe(document.body, { childList: true, subtree: true });
+
 
                 // setupTitleObserver();
 
