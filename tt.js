@@ -5442,6 +5442,7 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
     }
 
     function updateDisplayedStatistics(isBackgroundUpdate = false) {
+    flashStuff(unreadIds.size, newReplyIds.size);
         const threadsTrackedElem = document.getElementById('otk-threads-tracked-stat');
         const totalMessagesElem = document.getElementById('otk-total-messages-stat');
         const localImagesElem = document.getElementById('otk-local-images-stat');
@@ -5451,118 +5452,6 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
             consoleWarn('One or more statistics elements not found in GUI.');
             return;
         }
-
-        const getOldStatValue = (id) => {
-            const elem = document.getElementById(`otk-stat-new-${id}`);
-            return elem ? parseInt(elem.textContent.replace(/[^\d]/g, '') || '0', 10) : 0;
-        };
-
-        const oldNewMessages = getOldStatValue('messages');
-
-        let totalMessagesInStorage = 0;
-        let totalImagesInStorage = 0;
-        let totalVideosInStorage = 0;
-
-        for (const threadId in messagesByThreadId) {
-            const messages = messagesByThreadId[threadId] || [];
-            totalMessagesInStorage += messages.length;
-            messages.forEach(msg => {
-                if (msg.attachment) {
-                    const ext = msg.attachment.ext.toLowerCase();
-                    if (['.jpg', '.jpeg', '.png', '.gif'].includes(ext)) {
-                        totalImagesInStorage++;
-                    } else if (['.webm', '.mp4'].includes(ext)) {
-                        totalVideosInStorage++;
-                    }
-                }
-            });
-        }
-
-        let newMessages = unreadIds.size;
-        const newRepliesCount = newReplyIds.size;
-
-        const viewerIsOpen = otkViewer && otkViewer.style.display === 'block';
-        const autoLoad = localStorage.getItem('otkAutoLoadUpdates') === 'true';
-
-        if (viewerIsOpen && autoLoad) {
-            newMessages = 0;
-        }
-
-        const mainMessagesCount = viewerIsOpen ? renderedMessageIdsInViewer.size : totalMessagesInStorage;
-        const mainImagesCount = viewerIsOpen ? uniqueImageViewerHashes.size : totalImagesInStorage;
-        const mainVideosCount = viewerIsOpen ? (viewerTopLevelAttachedVideoHashes.size + viewerTopLevelEmbedIds.size) : totalVideosInStorage;
-        const liveThreadsCount = activeThreads.length;
-
-        const updateStatLine = (container, baseText, newCount, startCount, id, newReplies = 0) => {
-            let lineContainer = document.getElementById(`otk-stat-${id}`);
-            if (!lineContainer) {
-                lineContainer = document.createElement('div');
-                lineContainer.id = `otk-stat-${id}`;
-                lineContainer.style.display = 'flex';
-                lineContainer.style.justifyContent = 'flex-start';
-                lineContainer.style.width = '100%';
-
-                const baseSpan = document.createElement('span');
-                baseSpan.id = `otk-stat-base-${id}`;
-                lineContainer.appendChild(baseSpan);
-
-                const newCountSpan = document.createElement('span');
-                newCountSpan.id = `otk-stat-new-${id}`;
-                newCountSpan.className = 'new-stat';
-                newCountSpan.style.color = 'var(--otk-background-updates-stats-text-color)';
-                newCountSpan.style.marginLeft = '5px';
-                lineContainer.appendChild(newCountSpan);
-
-                if (id === 'messages') {
-                    const newRepliesSpan = document.createElement('span');
-                    newRepliesSpan.id = 'otk-stat-new-replies';
-                    newRepliesSpan.className = 'new-stat';
-                    newRepliesSpan.style.color = 'var(--otk-replies-stat-color)';
-                    newRepliesSpan.style.marginLeft = '5px';
-                    lineContainer.appendChild(newRepliesSpan);
-                }
-                container.appendChild(lineContainer);
-            }
-
-            const baseSpan = document.getElementById(`otk-stat-base-${id}`);
-            baseSpan.innerHTML = '';
-
-            const dashSpan = document.createElement('span');
-            dashSpan.textContent = '• ';
-            dashSpan.style.color = 'var(--otk-stats-dash-color)';
-            const textNode = document.createTextNode(baseText.substring(2));
-            baseSpan.appendChild(dashSpan);
-            baseSpan.appendChild(textNode);
-
-            const newCountSpan = document.getElementById(`otk-stat-new-${id}`);
-            if (newCount > 0) {
-                if (isBackgroundUpdate) {
-                    animateStat(newCountSpan, startCount, newCount);
-                } else {
-                    newCountSpan.textContent = `(+${newCount})`;
-                }
-            } else {
-                newCountSpan.textContent = '';
-            }
-
-            if (id === 'messages') {
-                const newRepliesSpan = document.getElementById('otk-stat-new-replies');
-                if (newReplies > 0) {
-                    newRepliesSpan.textContent = `(+${newReplies})`;
-                } else {
-                    newRepliesSpan.textContent = '';
-                }
-            }
-        };
-
-        const paddingLength = 4;
-        updateStatLine(threadsTrackedElem, `- ${padNumber(liveThreadsCount, paddingLength)} Live Thread${liveThreadsCount === 1 ? '' : 's'}`, 0, 0, 'threads');
-        updateStatLine(totalMessagesElem, `- ${padNumber(mainMessagesCount, paddingLength)} Total Message${mainMessagesCount === 1 ? '' : 's'}`, newMessages, oldNewMessages, 'messages', newRepliesCount);
-        updateStatLine(localImagesElem, `- ${padNumber(mainImagesCount, paddingLength)} Image${mainImagesCount === 1 ? '' : 's'}`, 0, 0, 'images');
-        updateStatLine(localVideosElem, `- ${padNumber(mainVideosCount, paddingLength)} Video${mainVideosCount === 1 ? '' : 's'}`, 0, 0, 'videos');
-
-        flashStuff(newMessages, newRepliesCount);
-    }
 
         const getOldStatValue = (id) => {
             const elem = document.getElementById(`otk-stat-new-${id}`);
