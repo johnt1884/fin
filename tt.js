@@ -1207,10 +1207,6 @@ function createTweetEmbedElement(tweetId) {
             height: 100%;               /* Occupy full height of parent for space-between */
         `;
 
-        const btnViewer = createTrackerButton("Viewer");
-        btnViewer.id = 'otk-toggle-viewer-btn';
-        btnViewer.addEventListener('click', toggleViewer);
-        buttonContainer.appendChild(btnViewer);
 
         otkGui.appendChild(buttonContainer);
     } else { // If GUI wrapper exists, ensure consistency
@@ -1892,7 +1888,9 @@ function toggleViewer() {
             }
         }
     }
-}function findMessageById(messageId) {
+}
+
+function findMessageById(messageId) {
         messageId = Number(messageId);
         for (const threadId in messagesByThreadId) {
             if (messagesByThreadId.hasOwnProperty(threadId)) {
@@ -5697,61 +5695,6 @@ async function backgroundRefreshThreadsAndMessages(options = {}) { // Added opti
         }
     }
 
-    \/\/ --- Scroll Buttons ---\
-    function createScrollButtons() {\
-        if (document.getElementById('otk-scroll-top-btn')) {\
-            return; \/\/ Already created\
-        }\
-\
-        const scrollTopBtn = document.createElement('div');\
-        scrollTopBtn.id = 'otk-scroll-top-btn';\
-        scrollTopBtn.style.display = 'none'; \/\/ Initially hidden\
-        scrollTopBtn.addEventListener('click', () => {\
-            const messagesContainer = document.getElementById('otk-messages-container');\
-            if (messagesContainer) {\
-                messagesContainer.scrollTo({ top: 0, behavior: 'smooth' });\
-            }\
-        });\
-        document.body.appendChild(scrollTopBtn);\
-\
-        const scrollBottomBtn = document.createElement('div');\
-        scrollBottomBtn.id = 'otk-scroll-bottom-btn';\
-        scrollBottomBtn.style.display = 'none'; \/\/ Initially hidden\
-        scrollBottomBtn.addEventListener('click', () => {\
-            const messagesContainer = document.getElementById('otk-messages-container');\
-            if (messagesContainer) {\
-                messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });\
-            }\
-        });\
-        document.body.appendChild(scrollBottomBtn);\
-    }
-    function setupTitleObserver() {
-        const targetNode = document.getElementById('otk-stat-new-messages');
-        const newRepliesNode = document.getElementById('otk-stat-new-replies');
-        if (!targetNode) {
-            consoleError("Could not find the target node for title observer: #otk-stat-new-messages");
-            return;
-        }
-
-        const observer = new MutationObserver(mutations => {
-            mutations.forEach(mutation => {
-                const newMessagesText = targetNode.textContent.trim();
-                if (newMessagesText) {
-                    document.title = `${newMessagesText} ${originalTitle}`;
-                } else {
-                    document.title = originalTitle;
-                }
-            });
-        });
-
-        observer.observe(targetNode, {
-            childList: true,
-            characterData: true,
-            subtree: true
-        });
-
-        consoleLog("Title observer is set up and watching for changes on #otk-stat-new-messages.");
-    }
 
     function createTrackerButton(text, id = null) {
         const button = document.createElement('button');
@@ -9884,79 +9827,6 @@ function setupFilterWindow() {
     }
 
 
-    \/\/ --- Scroll Buttons ---\
-    function createScrollButtons() {\
-        if (document.getElementById('otk-scroll-top-btn')) {\
-            return; \/\/ Already created\
-        }\
-\
-        const scrollTopBtn = document.createElement('div');\
-        scrollTopBtn.id = 'otk-scroll-top-btn';\
-        scrollTopBtn.style.display = 'none'; \/\/ Initially hidden\
-        scrollTopBtn.addEventListener('click', () => {\
-            const messagesContainer = document.getElementById('otk-messages-container');\
-            if (messagesContainer) {\
-                messagesContainer.scrollTo({ top: 0, behavior: 'smooth' });\
-            }\
-        });\
-        document.body.appendChild(scrollTopBtn);\
-\
-        const scrollBottomBtn = document.createElement('div');\
-        scrollBottomBtn.id = 'otk-scroll-bottom-btn';\
-        scrollBottomBtn.style.display = 'none'; \/\/ Initially hidden\
-        scrollBottomBtn.addEventListener('click', () => {\
-            const messagesContainer = document.getElementById('otk-messages-container');\
-            if (messagesContainer) {\
-                messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });\
-            }\
-        });\
-        document.body.appendChild(scrollBottomBtn);\
-    }
-function setupTitleObserver() {
-    const totalMessagesNode = document.getElementById('otk-total-messages-stat');
-
-    if (!totalMessagesNode) {
-        console.warn('[TitleObserver] Could not find the total messages stat node for title updates.');
-        return;
-    }
-
-    const updateTitle = () => {
-        const newMessagesNode = totalMessagesNode.querySelector('#otk-stat-new-messages');
-        const newRepliesNode = totalMessagesNode.querySelector('#otk-stat-new-replies');
-
-        const newMessagesText = (newMessagesNode?.textContent || '').trim();
-        const newRepliesText = (newRepliesNode?.textContent || '').trim();
-
-        let titlePrefix = '';
-        const hasMessages = newMessagesText.length > 0;
-        const hasReplies = newRepliesText.length > 0;
-
-        if (hasMessages && hasReplies) {
-            const msgCount = newMessagesText.replace(/\D/g, '');
-            const replyCount = newRepliesText.replace(/\D/g, '');
-            titlePrefix = `(${msgCount} | ${replyCount}) `;
-        } else if (hasMessages) {
-            titlePrefix = `${newMessagesText} `;
-        } else if (hasReplies) {
-            const replyCount = newRepliesText.replace(/\D/g, '');
-            titlePrefix = `(0 | ${replyCount}) `;
-        }
-
-        if (document.title !== originalTitle && !document.title.startsWith('(')) {
-            originalTitle = document.title;
-        }
-
-        document.title = titlePrefix + originalTitle;
-    };
-
-    const observer = new MutationObserver(updateTitle);
-
-    const observerConfig = { childList: true, subtree: true, characterData: true };
-
-    observer.observe(totalMessagesNode, observerConfig);
-
-    updateTitle();
-}
 
     async function main() {
         createScrollButtons();
@@ -10401,7 +10271,7 @@ function setupTitleObserver() {
                 observer.observe(document.body, { childList: true, subtree: true });
 
 
-                setupTitleObserver();
+
 
             } catch (error) {
                 consoleError("Critical error during main initialization sequence:", error);
