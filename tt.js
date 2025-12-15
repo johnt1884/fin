@@ -2546,6 +2546,27 @@ function renderThreadList() {
     }
 
     async function renderMessagesInViewer(options = {}) {
+        if (otkViewer && !document.getElementById('otk-scroll-top-btn')) {
+            const scrollTopBtn = document.createElement('div');
+            scrollTopBtn.id = 'otk-scroll-top-btn';
+            scrollTopBtn.addEventListener('click', () => {
+                const messagesContainer = document.getElementById('otk-messages-container');
+                if (messagesContainer) {
+                    messagesContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            });
+            otkViewer.appendChild(scrollTopBtn);
+
+            const scrollBottomBtn = document.createElement('div');
+            scrollBottomBtn.id = 'otk-scroll-bottom-btn';
+            scrollBottomBtn.addEventListener('click', () => {
+                const messagesContainer = document.getElementById('otk-messages-container');
+                if (messagesContainer) {
+                    messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+                }
+            });
+            otkViewer.appendChild(scrollBottomBtn);
+        }
     const { isToggleOpen = false } = options;
         if (!otkViewer) {
             consoleError("Viewer element not found, cannot render messages.");
@@ -9994,6 +10015,42 @@ function setupTitleObserver() {
                 --otk-options-main-bg-color: #2C2C2C;
                 --otk-options-alt-bg-color: #383838;
                 --otk-replies-stat-color: #ff8040;
+            }
+
+            #otk-scroll-top-btn,
+            #otk-scroll-bottom-btn {
+                position: fixed;
+                right: 20px;
+                width: 40px;
+                height: 40px;
+                background-color: rgba(0, 0, 0, 0.5);
+                border-radius: 50%;
+                cursor: pointer;
+                z-index: 100001; /* Above viewer content */
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                opacity: 0.7;
+                transition: opacity 0.2s;
+            }
+
+            #otk-scroll-top-btn:hover,
+            #otk-scroll-bottom-btn:hover {
+                opacity: 1;
+            }
+
+            #otk-scroll-top-btn {
+                bottom: 70px;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' width='24px' height='24px'%3E%3Cpath d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z'/%3E%3C/svg%3E");
+                background-repeat: no-repeat;
+                background-position: center;
+            }
+
+            #otk-scroll-bottom-btn {
+                bottom: 20px;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' width='24px' height='24px'%3E%3Cpath d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z'/%3E%3C/svg%3E");
+                background-repeat: no-repeat;
+                background-position: center;
             }
 
             /* Refined Chrome Scrollbar Styling for Overlay Effect */
