@@ -10233,7 +10233,7 @@ function setupTitleObserver() {
                 observer.observe(document.body, { childList: true, subtree: true });
 
 
-                // setupTitleObserver();
+                setupTitleObserver();
 
             } catch (error) {
                 consoleError("Critical error during main initialization sequence:", error);
