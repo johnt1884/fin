@@ -1218,7 +1218,7 @@ function createTweetEmbedElement(tweetId) {
             justify-content: center;
             gap: 10px;
             position: fixed;
-            right: 10px;
+            right: 5px;
             top: 95px; /* Position it just below the GUI bar */
             z-index: 9998;
         `;
