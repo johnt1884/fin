@@ -1230,7 +1230,7 @@ function createTweetEmbedElement(tweetId) {
         scrollTopButton.style.cssText = `
             cursor: pointer;
             font-size: 16px;
-            color: var(--otk-gui-text-color);
+            color: var(--otk-scroll-top-bottom-icon-color, var(--otk-gui-text-color));
         `;
 
         const scrollBottomButton = document.createElement('div');
@@ -1240,7 +1240,7 @@ function createTweetEmbedElement(tweetId) {
         scrollBottomButton.style.cssText = `
             cursor: pointer;
             font-size: 16px;
-            color: var(--otk-gui-text-color);
+            color: var(--otk-scroll-top-bottom-icon-color, var(--otk-gui-text-color));
         `;
 
         scrollButtonContainer.appendChild(scrollTopButton);
@@ -8920,6 +8920,14 @@ function createThemeOptionRow(options) {
             requiresRerender: false
         }));
         miscSectionContent.appendChild(createThemeOptionRow({
+            labelText: "Scroll to Top/Bottom Icon Colour:",
+            storageKey: 'scrollTopBottomIconColor',
+            cssVariable: '--otk-scroll-top-bottom-icon-color',
+            defaultValue: '#FFFFFF',
+            inputType: 'color',
+            idSuffix: 'scroll-top-bottom-icon'
+        }));
+        miscSectionContent.appendChild(createThemeOptionRow({
             labelText: "Tab Title Stats Animation Speed:",
             storageKey: 'tabTitleStatsAnimationSpeed',
             defaultValue: '1',
@@ -9049,7 +9057,8 @@ function createThemeOptionRow(options) {
                 { storageKey: 'mediaControlsBgColorEven', cssVariable: '--otk-media-controls-bg-color-even', defaultValue: 'rgba(217, 217, 217, 0.8)', inputType: 'color', idSuffix: 'media-controls-bg-even' },
                 { storageKey: 'mediaMenuIconColor', cssVariable: '--otk-media-menu-icon-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'media-menu-icon' },
                 { storageKey: 'optionsMainBgColor', cssVariable: '--otk-options-main-bg-color', defaultValue: '#2c2c2c', inputType: 'color', idSuffix: 'options-main-bg' },
-                { storageKey: 'optionsAltBgColor', cssVariable: '--otk-options-alt-bg-color', defaultValue: '#383838', inputType: 'color', idSuffix: 'options-alt-bg' }
+                { storageKey: 'optionsAltBgColor', cssVariable: '--otk-options-alt-bg-color', defaultValue: '#383838', inputType: 'color', idSuffix: 'options-alt-bg' },
+                { storageKey: 'scrollTopBottomIconColor', cssVariable: '--otk-scroll-top-bottom-icon-color', defaultValue: '#FFFFFF', inputType: 'color', idSuffix: 'scroll-top-bottom-icon' }
             ];
         }
 
