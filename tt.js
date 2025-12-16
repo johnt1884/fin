@@ -10090,6 +10090,7 @@ function setupScrollButtons() {
                 --otk-options-main-bg-color: #2C2C2C;
                 --otk-options-alt-bg-color: #383838;
                 --otk-replies-stat-color: #ff8040;
+                --otk-scroll-top-bottom-icon-color: #FFFFFF;
             }
 
             /* Refined Chrome Scrollbar Styling for Overlay Effect */
