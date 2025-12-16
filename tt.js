@@ -1217,10 +1217,10 @@ function createTweetEmbedElement(tweetId) {
             align-items: center;
             justify-content: center;
             gap: 10px;
-            position: absolute;
-            right: 5px;
-            top: 50%;
-            transform: translateY(-50%);
+            position: fixed;
+            right: 15px;
+            top: 95px; /* Position it just below the GUI bar */
+            z-index: 9998;
         `;
 
         const scrollTopButton = document.createElement('div');
@@ -8652,6 +8652,9 @@ function createThemeOptionRow(options) {
             select.value = (JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {})[options.storageKey] || options.defaultValue;
             select.addEventListener('change', () => {
                 saveThemeSetting(options.storageKey, select.value, options.requiresRerender || false);
+                if (options.storageKey === 'otkScrollButtonPosition') {
+                    applyScrollButtonPosition();
+                }
             });
             controlsWrapperDiv.appendChild(select);
             group.appendChild(label);
@@ -8902,6 +8905,13 @@ function createThemeOptionRow(options) {
         evenMessagesSection.appendChild(createThemeOptionRow({ labelText: "Pin Icon (Active):", storageKey: 'pinIconColorActiveEven', cssVariable: '--otk-pin-icon-color-active-even', defaultValue: '#ffffff', inputType: 'color', idSuffix: 'pin-icon-active-even' }));
         // --- Misc Section ---
         const miscSectionContent = createCollapsibleSubSection('Misc');
+        miscSectionContent.appendChild(createDropdownRow({
+            labelText: 'Scroll Button Position:',
+            storageKey: 'otkScrollButtonPosition',
+            options: ['Default', 'Bottom of Page'],
+            defaultValue: 'Default',
+            requiresRerender: false
+        }));
         miscSectionContent.appendChild(createDropdownRow({
             labelText: 'Tab Title Stats Animation:',
             storageKey: 'tabTitleStatsAnimation',
@@ -9618,6 +9628,22 @@ function renderFilterList() {
     }
 }
 
+function applyScrollButtonPosition() {
+    const themeSettings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
+    const position = themeSettings.otkScrollButtonPosition || 'Default';
+    const scrollButtonContainer = document.getElementById('otk-scroll-button-container');
+
+    if (scrollButtonContainer) {
+        if (position === 'Bottom of Page') {
+            scrollButtonContainer.style.top = 'auto';
+            scrollButtonContainer.style.bottom = '15px';
+        } else { // Default
+            scrollButtonContainer.style.top = '95px';
+            scrollButtonContainer.style.bottom = 'auto';
+        }
+    }
+}
+
 function setupFilterWindow() {
     consoleLog("Setting up Filter Window...");
 
@@ -10228,6 +10254,7 @@ function setupScrollButtons() {
         setupOptionsWindow(); // Call to create the options window shell and event listeners
         setupFilterWindow();
         applyThemeSettings(); // Apply any saved theme settings
+        applyScrollButtonPosition();
         await fetchTimezones();
         setupTimezoneSearch();
 
