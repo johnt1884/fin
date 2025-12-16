@@ -9621,67 +9621,6 @@ function applyThemeSettings(options = {}) {
     consoleLog("Theme settings applied.");
 }
 
-function applyThemeSettings(options = {}) {
-    const { forceRerender = false } = options;
-    consoleLog("Applying theme settings...");
-
-    const themeSettings = JSON.parse(localStorage.getItem("otkThemeSettings")) || {};
-
-    const allOptionConfigs = getAllOptionConfigs();
-
-    allOptionConfigs.forEach(opt => {
-        const savedValue = themeSettings[opt.storageKey];
-        const valueToApply = savedValue !== undefined ? savedValue : opt.defaultValue;
-
-        if (opt.cssVariable) {
-            if (opt.storageKey === "loadingOverlayBaseHexColor") {
-                document.documentElement.style.setProperty("--otk-loading-overlay-bg-rgb", hexToRgbParts(valueToApply));
-            } else if (opt.storageKey === "loadingOverlayOpacity") {
-                 document.documentElement.style.setProperty("--otk-loading-overlay-opacity", valueToApply);
-            }
-            else {
-                document.documentElement.style.setProperty(opt.cssVariable, valueToApply);
-            }
-        }
-    });
-
-    const guiBgUrl = themeSettings.guiBackgroundImageUrl || "";
-    const guiWrapper = document.getElementById("otk-tracker-gui-wrapper");
-    if (guiWrapper) {
-        guiWrapper.style.backgroundImage = guiBgUrl ? `url(${guiBgUrl})` : "none";
-        guiWrapper.style.backgroundSize = themeSettings.guiBgSize || "cover";
-        guiWrapper.style.backgroundRepeat = themeSettings.guiBgRepeat || "no-repeat";
-        guiWrapper.style.backgroundPosition = themeSettings.guiBgPosition || "center";
-    }
-
-    const viewerBgUrl = themeSettings.viewerBackgroundImageUrl || "";
-    if (otkViewer) {
-        otkViewer.style.backgroundImage = viewerBgUrl ? `url(${viewerBgUrl})` : "none";
-        otkViewer.style.backgroundSize = themeSettings.viewerBgSize || "cover";
-        otkViewer.style.backgroundRepeat = themeSettings.viewerBgRepeat || "no-repeat";
-        otkViewer.style.backgroundPosition = themeSettings.viewerBgPosition || "center";
-    }
-
-    const pipBgColor = themeSettings.pipBackgroundColor || "#1a1a1a";
-    const pipBgUrl = themeSettings.pipBackgroundImageUrl || "";
-    document.documentElement.style.setProperty("--otk-pip-bg-color", pipBgColor);
-    if (pipBgUrl) {
-        document.documentElement.style.setProperty("--otk-pip-bg-image", `url(${pipBgUrl})`);
-        document.documentElement.style.setProperty("--otk-pip-bg-size", themeSettings.pipBgSize || "cover");
-        document.documentElement.style.setProperty("--otk-pip-bg-repeat", themeSettings.pipBgRepeat || "no-repeat");
-        document.documentElement.style.setProperty("--otk-pip-bg-position", themeSettings.pipBgPosition || "center");
-    } else {
-        document.documentElement.style.setProperty("--otk-pip-bg-image", "none");
-    }
-
-
-    if (forceRerender && otkViewer && otkViewer.style.display === "block") {
-        consoleLog("Theme change requires viewer re-render.");
-        renderMessagesInViewer();
-    }
-    consoleLog("Theme settings applied.");
-}
-
 function getAllOptionConfigs() {
             // Note: labelText is not part of this config object, it's passed directly to createThemeOptionRow.
             // This function is primarily for mapping storageKey, cssVariable, defaultValue, inputType, etc.
