@@ -8968,8 +8968,9 @@ function createThemeOptionRow(options) {
         resetAllColorsRow.appendChild(resetAllColorsButton);
         themeOptionsContainer.appendChild(resetAllColorsRow);
 
+    }
         // Helper function to get all theme configurations (used by save and reset)
-        function getAllOptionConfigs() {
+    function getAllOptionConfigs() {
             // Note: labelText is not part of this config object, it's passed directly to createThemeOptionRow.
             // This function is primarily for mapping storageKey, cssVariable, defaultValue, inputType, etc.
             // The spelling change from "Color" to "Colour" happens in the createThemeOptionRow calls.
