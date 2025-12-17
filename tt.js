@@ -111,11 +111,11 @@ function createStatsDisplayElements(statsWrapperParam) {
             if (isOriginalTitle) {
                 let titlePrefix = '';
                 if (newMessages > 0 && newReplies > 0) {
-                    titlePrefix = `(${newMessages}|${newReplies}) `;
+                    titlePrefix = `(+${newMessages} | +${newReplies}) `;
                 } else if (newMessages > 0) {
-                    titlePrefix = `(${newMessages}) `;
+                    titlePrefix = `(+${newMessages}) `;
                 } else if (newReplies > 0) {
-                    titlePrefix = `(0|${newReplies}) `;
+                    titlePrefix = `(0 | +${newReplies}) `;
                 }
                 document.title = titlePrefix + originalTitle;
             } else {
@@ -1218,7 +1218,7 @@ function createTweetEmbedElement(tweetId) {
             justify-content: center;
             gap: 10px;
             position: fixed;
-            right: 5px;
+            right: 7px;
             top: 95px; /* Position it just below the GUI bar */
             z-index: 9998;
         `;
@@ -10264,6 +10264,12 @@ function setupScrollButtons() {
         setupOptionsWindow(); // Call to create the options window shell and event listeners
         setupFilterWindow();
         applyThemeSettings(); // Apply any saved theme settings
+
+            // Explicitly set the scroll icon color from storage, falling back to the default if not set.
+            const themeSettings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
+            const scrollIconColor = themeSettings.scrollTopBottomIconColor || '#FFFFFF';
+            document.documentElement.style.setProperty('--otk-scroll-top-bottom-icon-color', scrollIconColor);
+
         applyScrollButtonPosition();
         await fetchTimezones();
         setupTimezoneSearch();
