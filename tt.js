@@ -111,11 +111,11 @@ function createStatsDisplayElements(statsWrapperParam) {
             if (isOriginalTitle) {
                 let titlePrefix = '';
                 if (newMessages > 0 && newReplies > 0) {
-                    titlePrefix = `(${newMessages}|${newReplies}) `;
+                    titlePrefix = `(+${newMessages} | +${newReplies}) `;
                 } else if (newMessages > 0) {
-                    titlePrefix = `(${newMessages}) `;
+                    titlePrefix = `(+${newMessages}) `;
                 } else if (newReplies > 0) {
-                    titlePrefix = `(0|${newReplies}) `;
+                    titlePrefix = `(0 | +${newReplies}) `;
                 }
                 document.title = titlePrefix + originalTitle;
             } else {
@@ -1218,7 +1218,7 @@ function createTweetEmbedElement(tweetId) {
             justify-content: center;
             gap: 10px;
             position: fixed;
-            right: 5px;
+            right: 7px;
             top: 95px; /* Position it just below the GUI bar */
             z-index: 9998;
         `;
