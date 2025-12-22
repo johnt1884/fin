@@ -773,7 +773,7 @@ function createKickEmbedElement(clipId) {
 }
 
 function createTikTokEmbedElement(videoId) {
-    const embedUrl = `https://www.tiktok.com/player/v1/${videoId}?autoplay=0`;
+    const embedUrl = `https://www.tiktok.com/embed/v2/${videoId}`;
 
     const wrapper = document.createElement('div');
     wrapper.className = 'otk-tiktok-embed-wrapper otk-embed-inline';
@@ -10809,4 +10809,4 @@ function setupTimezoneSearch() {
 
 })();
 
-
+
