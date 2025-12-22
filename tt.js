@@ -5620,7 +5620,10 @@ const scrollButtonContainer = document.getElementById('otk-scroll-button-contain
 
             if (id === 'messages') {
                 const newRepliesSpan = document.getElementById('otk-stat-new-replies');
-                if (newReplies > 0) {
+                if (newCount > 0 && newReplies > 0) {
+                    newCountSpan.textContent = `(+${newCount} |`;
+                    newRepliesSpan.textContent = `+${newReplies})`;
+                } else if (newReplies > 0) {
                     newRepliesSpan.textContent = `(+${newReplies})`;
                 } else {
                     newRepliesSpan.textContent = '';
